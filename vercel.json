@@ -4,16 +4,14 @@
   "installCommand": "npm install",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "/api"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "source": "/api/(.*)",
+      "destination": "/api/index"
     }
   ],
+  "cleanUrls": true,
+  "trailingSlash": false,
   "functions": {
-    "api/*.ts": {
+    "api/index.ts": {
       "maxDuration": 10
     }
   }
