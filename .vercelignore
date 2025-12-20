@@ -1,0 +1,13 @@
+node_modules
+.git
+.env
+.env.local
+.replit
+.upm
+.local
+*.log
+*.md
+design_guidelines.md
+replit.md
+about-town.html
+script/
