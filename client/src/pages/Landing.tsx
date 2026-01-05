@@ -151,7 +151,7 @@ export default function Landing() {
             Track Maryland state legislation that impacts your community
           </p>
           <p className="text-2xl md:text-3xl text-foreground mb-4 font-medium">
-            What's happening in Annapolis?
+            What's happening in Maryland?
           </p>
           <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
             Real-time access to Maryland House and Senate bills.
