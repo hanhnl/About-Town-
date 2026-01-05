@@ -26,6 +26,7 @@ import {
   CheckCircle2
 } from "lucide-react";
 import { NeighborhoodGridLogo } from "@/components/NeighborhoodGridLogo";
+import { NewsletterSignup } from "@/components/NewsletterSignup";
 
 interface RealBill {
   billNumber: string;
@@ -139,7 +140,7 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section with Address Search */}
-      <section className="py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-primary/10 via-primary/5 to-background">
+      <section className="py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-primary/10 via-primary/5 to-background animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="max-w-4xl mx-auto text-center">
           <div className="flex items-center justify-center gap-3 mb-8">
             <NeighborhoodGridLogo size={56} />
@@ -264,16 +265,17 @@ export default function Landing() {
             </div>
           ) : (
             <div className="space-y-4">
-              {displayedBills.map((bill) => {
+              {displayedBills.map((bill, index) => {
                 const totalVotes = bill.yesVotes.length + bill.noVotes.length;
-                const supportPercent = totalVotes > 0 
-                  ? Math.round((bill.yesVotes.length / totalVotes) * 100) 
+                const supportPercent = totalVotes > 0
+                  ? Math.round((bill.yesVotes.length / totalVotes) * 100)
                   : 50;
 
                 return (
-                  <Card 
-                    key={bill.billNumber} 
-                    className="hover-elevate"
+                  <Card
+                    key={bill.billNumber}
+                    className="hover-elevate transition-all duration-300 hover:shadow-lg hover:border-primary/50 animate-in fade-in slide-in-from-left-4"
+                    style={{ animationDelay: `${index * 100}ms` }}
                     data-testid={`card-bill-${bill.billNumber}`}
                   >
                     <CardContent className="p-5">
@@ -300,10 +302,31 @@ export default function Landing() {
                           <h3 className="text-lg font-medium text-foreground mb-2 leading-snug">
                             {bill.title}
                           </h3>
-                          <p className="text-sm text-muted-foreground mb-3">
-                            Sponsored by {bill.sponsors.join(", ")}
-                            {bill.introductionDate && ` | Introduced ${new Date(bill.introductionDate).toLocaleDateString()}`}
-                          </p>
+                          {bill.sponsors.length > 0 && (
+                            <div className="mb-3">
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Sponsors:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {bill.sponsors.slice(0, 3).map((sponsor, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground"
+                                  >
+                                    {sponsor}
+                                  </span>
+                                ))}
+                                {bill.sponsors.length > 3 && (
+                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary/50 text-secondary-foreground">
+                                    +{bill.sponsors.length - 3} more
+                                  </span>
+                                )}
+                              </div>
+                              {bill.introductionDate && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Introduced {new Date(bill.introductionDate).toLocaleDateString()}
+                                </p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Council Vote Breakdown */}
                           {totalVotes > 0 && (
@@ -410,12 +433,12 @@ export default function Landing() {
       {/* How It Works */}
       <section className="py-16 px-4 sm:px-6 lg:px-8 bg-card">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-10">
+          <h2 className="text-2xl md:text-3xl font-semibold text-foreground text-center mb-10 animate-in fade-in slide-in-from-top-4 duration-700">
             Civic Engagement Made Simple
           </h2>
           <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4">
+            <div className="text-center p-6 rounded-lg transition-all duration-300 hover:bg-background hover:shadow-md animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: "100ms" }}>
+              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4 transition-transform duration-300 hover:scale-110">
                 <MapPin className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
@@ -425,8 +448,8 @@ export default function Landing() {
                 Access Maryland state bills that affect your community.
               </p>
             </div>
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4">
+            <div className="text-center p-6 rounded-lg transition-all duration-300 hover:bg-background hover:shadow-md animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: "200ms" }}>
+              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4 transition-transform duration-300 hover:scale-110">
                 <FileText className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
@@ -436,8 +459,8 @@ export default function Landing() {
                 Plain-language summaries explain how each bill affects you.
               </p>
             </div>
-            <div className="text-center">
-              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4">
+            <div className="text-center p-6 rounded-lg transition-all duration-300 hover:bg-background hover:shadow-md animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: "300ms" }}>
+              <div className="inline-flex items-center justify-center p-4 rounded-full bg-primary/10 mb-4 transition-transform duration-300 hover:scale-110">
                 <Users className="h-8 w-8 text-primary" />
               </div>
               <h3 className="text-lg font-medium text-foreground mb-2">
@@ -448,6 +471,13 @@ export default function Landing() {
               </p>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* Newsletter Signup */}
+      <section className="py-12 px-4 sm:px-6 lg:px-8 bg-background">
+        <div className="max-w-2xl mx-auto">
+          <NewsletterSignup />
         </div>
       </section>
 
