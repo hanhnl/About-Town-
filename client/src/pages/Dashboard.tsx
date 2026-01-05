@@ -42,9 +42,38 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
+  // Try LegiScan API first, fallback to database bills
+  const { data: legiScanBills = [], isLoading: legiScanLoading } = useQuery<any[]>({
+    queryKey: ["/api/legiscan/bills"],
+    retry: 1,
   });
+
+  const { data: dbBills = [], isLoading: dbLoading } = useQuery<Bill[]>({
+    queryKey: ["/api/bills"],
+    enabled: legiScanBills.length === 0 && !legiScanLoading,
+  });
+
+  // Convert LegiScan bills to our Bill format
+  const bills = useMemo(() => {
+    if (legiScanBills.length > 0) {
+      return legiScanBills.map((bill: any) => ({
+        id: bill.billId,
+        billNumber: bill.billNumber,
+        title: bill.title,
+        summary: bill.description,
+        status: bill.status,
+        topic: 'community' as Topic, // Default topic, could be enhanced with AI categorization
+        voteDate: bill.statusDate,
+        supportVotes: 0,
+        opposeVotes: 0,
+        sourceUrl: bill.url,
+        sponsors: bill.sponsors || [],
+      }));
+    }
+    return dbBills;
+  }, [legiScanBills, dbBills]);
+
+  const isLoading = legiScanLoading || dbLoading;
 
   const filteredBills = useMemo(() => {
     return bills
@@ -85,12 +114,15 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+        <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
           <h1 className="text-3xl font-semibold text-foreground mb-2" data-testid="text-page-title">
-            Local Legislation
+            Maryland State Legislation
           </h1>
           <p className="text-lg text-muted-foreground">
-            Bills affecting your community in Montgomery County, Maryland
+            {legiScanBills.length > 0
+              ? `Tracking ${bills.length} bills from the Maryland General Assembly`
+              : "Bills affecting your community in Maryland"
+            }
           </p>
         </div>
 
@@ -112,15 +144,21 @@ export default function Dashboard() {
         </div>
 
         {filteredBills.length === 0 ? (
-          <div className="text-center py-16">
+          <div className="text-center py-16 animate-in fade-in duration-500">
             <p className="text-lg text-muted-foreground">
               No bills match your current filters. Try adjusting your search criteria.
             </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {filteredBills.map((bill) => (
-              <BillCard key={bill.id} bill={bill} />
+            {filteredBills.map((bill, index) => (
+              <div
+                key={bill.id}
+                className="animate-in fade-in slide-in-from-bottom-4 duration-500"
+                style={{ animationDelay: `${index * 50}ms` }}
+              >
+                <BillCard bill={bill} />
+              </div>
             ))}
           </div>
         )}
