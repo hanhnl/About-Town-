@@ -1,13 +1,4 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "devCommand": "npm run dev",
-  "installCommand": "npm install",
-  "framework": null,
-  "rewrites": [
-    {
-      "source": "./(.*)",
-      "destination": "/index.cjs"
-    }
-  ]
+  "buildCommand": "echo 'No build needed'",
+  "installCommand": "echo 'No install needed'"
 }
