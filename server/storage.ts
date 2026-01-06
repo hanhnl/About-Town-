@@ -1,7 +1,7 @@
-import { 
-  users, bills, councilMembers, comments, userVotes, campaignContributions, 
+import {
+  users, bills, councilMembers, comments, userVotes, campaignContributions,
   councilVotes, billTimeline, relatedBills, jurisdictions, zipcodes, amendments, billStars,
-  type User, type InsertUser, 
+  type User, type InsertUser,
   type Bill, type InsertBill,
   type CouncilMember, type InsertCouncilMember,
   type Comment, type InsertComment,
@@ -14,7 +14,7 @@ import {
   type Amendment, type InsertAmendment,
   type BillStar, type InsertBillStar
 } from "@shared/schema";
-import { db } from "./db";
+import { db, isDatabaseConfigured } from "./db";
 import { eq, ilike, and, or, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
@@ -70,7 +70,7 @@ export interface IStorage {
 
 export class DatabaseStorage implements IStorage {
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
+    const [user] = await db!.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
@@ -334,4 +334,6 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Only create storage if database is configured
+// If not configured, storage will be null and routes should check isDatabaseConfigured() first
+export const storage = db ? new DatabaseStorage() : null as any;
