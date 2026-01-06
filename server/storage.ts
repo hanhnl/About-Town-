@@ -334,6 +334,157 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-// Only create storage if database is configured
-// If not configured, storage will be null and routes should check isDatabaseConfigured() first
-export const storage = db ? new DatabaseStorage() : null as any;
+// NoOpStorage returns empty/safe defaults when database is not configured
+// This prevents crashes in routes that call storage methods
+export class NoOpStorage implements IStorage {
+  async getUser(_id: number): Promise<User | undefined> {
+    return undefined;
+  }
+
+  async getUserByUsername(_username: string): Promise<User | undefined> {
+    return undefined;
+  }
+
+  async getUserByEmail(_email: string): Promise<User | undefined> {
+    return undefined;
+  }
+
+  async createUser(_user: InsertUser): Promise<User> {
+    throw new Error("Database not configured - cannot create user");
+  }
+
+  async getZipcodeByCode(_zipcode: string): Promise<Zipcode | undefined> {
+    return undefined;
+  }
+
+  async getBills(_filters?: { topic?: string; status?: string; zipcode?: string; search?: string }): Promise<Bill[]> {
+    return [];
+  }
+
+  async getBill(_id: number): Promise<Bill | undefined> {
+    return undefined;
+  }
+
+  async getBillByNumber(_billNumber: string): Promise<Bill | undefined> {
+    return undefined;
+  }
+
+  async createBill(_bill: InsertBill): Promise<Bill> {
+    throw new Error("Database not configured - cannot create bill");
+  }
+
+  async updateBill(_id: number, _updates: Partial<InsertBill>): Promise<Bill | undefined> {
+    throw new Error("Database not configured - cannot update bill");
+  }
+
+  async getCouncilMembers(): Promise<CouncilMember[]> {
+    return [];
+  }
+
+  async getCouncilMember(_id: number): Promise<CouncilMember | undefined> {
+    return undefined;
+  }
+
+  async getCouncilMembersByDistrict(_district: string): Promise<CouncilMember[]> {
+    return [];
+  }
+
+  async createCouncilMember(_member: InsertCouncilMember): Promise<CouncilMember> {
+    throw new Error("Database not configured - cannot create council member");
+  }
+
+  async getComments(_billId: number): Promise<Comment[]> {
+    return [];
+  }
+
+  async createComment(_comment: InsertComment): Promise<Comment> {
+    throw new Error("Database not configured - cannot create comment");
+  }
+
+  async upvoteComment(_id: number): Promise<Comment | undefined> {
+    throw new Error("Database not configured - cannot upvote comment");
+  }
+
+  async getUserVote(_billId: number, _userId: number): Promise<UserVote | undefined> {
+    return undefined;
+  }
+
+  async createUserVote(_vote: InsertUserVote): Promise<UserVote> {
+    throw new Error("Database not configured - cannot create vote");
+  }
+
+  async getCampaignContributions(_councilMemberId?: number): Promise<CampaignContribution[]> {
+    return [];
+  }
+
+  async createCampaignContribution(_contribution: InsertCampaignContribution): Promise<CampaignContribution> {
+    throw new Error("Database not configured - cannot create contribution");
+  }
+
+  async getCouncilVotes(_billId: number): Promise<(CouncilVote & { councilMember?: CouncilMember })[]> {
+    return [];
+  }
+
+  async createCouncilVote(_vote: InsertCouncilVote): Promise<CouncilVote> {
+    throw new Error("Database not configured - cannot create council vote");
+  }
+
+  async getBillTimeline(_billId: number): Promise<BillTimeline[]> {
+    return [];
+  }
+
+  async createBillTimelineEvent(_event: InsertBillTimeline): Promise<BillTimeline> {
+    throw new Error("Database not configured - cannot create timeline event");
+  }
+
+  async getJurisdictions(): Promise<Jurisdiction[]> {
+    return [];
+  }
+
+  async getJurisdiction(_id: number): Promise<Jurisdiction | undefined> {
+    return undefined;
+  }
+
+  async getJurisdictionBySlug(_slug: string): Promise<Jurisdiction | undefined> {
+    return undefined;
+  }
+
+  async getZipcodes(_jurisdictionId?: number): Promise<Zipcode[]> {
+    return [];
+  }
+
+  async getZipcode(_zipcode: string): Promise<(Zipcode & { jurisdiction?: Jurisdiction }) | undefined> {
+    return undefined;
+  }
+
+  async getAmendments(_billId: number): Promise<Amendment[]> {
+    return [];
+  }
+
+  async createAmendment(_amendment: InsertAmendment): Promise<Amendment> {
+    throw new Error("Database not configured - cannot create amendment");
+  }
+
+  async starBill(_userId: number, _billId: number): Promise<BillStar> {
+    throw new Error("Database not configured - cannot star bill");
+  }
+
+  async unstarBill(_userId: number, _billId: number): Promise<void> {
+    throw new Error("Database not configured - cannot unstar bill");
+  }
+
+  async isStarred(_userId: number, _billId: number): Promise<boolean> {
+    return false;
+  }
+
+  async getStarredBills(_userId: number): Promise<(BillStar & { bill: Bill })[]> {
+    return [];
+  }
+
+  async getUserComments(_userId: number): Promise<(Comment & { bill?: Bill })[]> {
+    return [];
+  }
+}
+
+// Use NoOpStorage when database is not configured to prevent crashes
+export const storage = db ? new DatabaseStorage() : new NoOpStorage();
