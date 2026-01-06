@@ -514,19 +514,43 @@ export default function Landing() {
 
       {/* Footer */}
       <footer className="py-8 px-4 sm:px-6 lg:px-8 border-t border-border">
-        <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <NeighborhoodGridLogo size={24} />
-            <span className="font-medium text-foreground">About Town</span>
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+            <div className="flex items-center gap-2">
+              <NeighborhoodGridLogo size={24} />
+              <span className="font-medium text-foreground">About Town</span>
+            </div>
+            <p className="text-sm text-muted-foreground text-center">
+              By the People, For the People
+            </p>
+            <Link href="/about">
+              <Button variant="ghost" size="sm" data-testid="link-footer-about">
+                About & Data Sources
+              </Button>
+            </Link>
           </div>
-          <p className="text-sm text-muted-foreground text-center">
-            By the People, For the People
-          </p>
-          <Link href="/about">
-            <Button variant="ghost" size="sm" data-testid="link-footer-about">
-              About & Data Sources
-            </Button>
-          </Link>
+          <div className="text-center pt-4 border-t border-border/50">
+            <p className="text-xs text-muted-foreground">
+              Legislative data powered by{" "}
+              <a
+                href="https://legiscan.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                LegiScan API
+              </a>
+              {" "}and{" "}
+              <a
+                href="https://data.montgomerycountymd.gov"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                Montgomery County Open Data
+              </a>
+            </p>
+          </div>
         </div>
       </footer>
     </div>

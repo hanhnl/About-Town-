@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "@shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
 import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
@@ -13,15 +14,49 @@ export async function registerRoutes(
   app.get("/api/bills", async (req, res) => {
     try {
       const { topic, status, zipcode, search } = req.query;
-      const bills = await storage.getBills({
-        topic: typeof topic === 'string' ? topic : undefined,
-        status: typeof status === 'string' ? status : undefined,
-        zipcode: typeof zipcode === 'string' ? zipcode : undefined,
-        search: typeof search === 'string' ? search : undefined
-      });
-      res.json(bills);
+
+      // Try database first if configured
+      if (isDatabaseConfigured()) {
+        try {
+          const bills = await storage.getBills({
+            topic: typeof topic === 'string' ? topic : undefined,
+            status: typeof status === 'string' ? status : undefined,
+            zipcode: typeof zipcode === 'string' ? zipcode : undefined,
+            search: typeof search === 'string' ? search : undefined
+          });
+          return res.json(bills);
+        } catch (dbError) {
+          console.log('Database error fetching bills, falling back to LegiScan:', dbError);
+        }
+      }
+
+      // Fallback to LegiScan if database not available
+      if (isLegiScanConfigured()) {
+        const legiScanBills = await getMarylandBills({
+          limit: 50,
+          search: typeof search === 'string' ? search : undefined
+        });
+        // Convert LegiScan format to our Bill format
+        const bills = legiScanBills.map(bill => ({
+          id: bill.billId,
+          billNumber: bill.billNumber,
+          title: bill.title,
+          summary: bill.description,
+          status: bill.status,
+          topic: 'community',
+          voteDate: bill.statusDate,
+          supportVotes: 0,
+          opposeVotes: 0,
+          sourceUrl: bill.url,
+        }));
+        return res.json(bills);
+      }
+
+      // No data source available
+      res.json([]);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch bills" });
+      console.error('Error fetching bills:', error);
+      res.json([]); // Return empty array instead of error
     }
   });
 
@@ -202,20 +237,22 @@ export async function registerRoutes(
       }
 
       // Try to find the zipcode in our database (if database is configured)
-      try {
-        const result = await storage.getZipcode(zipcode);
+      if (isDatabaseConfigured()) {
+        try {
+          const result = await storage.getZipcode(zipcode);
 
-        if (result) {
-          // Known zipcode with full jurisdiction info
-          return res.json({
-            ...result,
-            supported: true,
-            hasJurisdiction: true
-          });
+          if (result) {
+            // Known zipcode with full jurisdiction info
+            return res.json({
+              ...result,
+              supported: true,
+              hasJurisdiction: true
+            });
+          }
+        } catch (dbError) {
+          // Database error - continue to fallback
+          console.log('Database error for zipcode lookup:', dbError);
         }
-      } catch (dbError) {
-        // Database not configured or error - continue to fallback
-        console.log('Database not available for zipcode lookup, using fallback');
       }
 
       // Accept all zipcodes - Maryland state legislation available for all
