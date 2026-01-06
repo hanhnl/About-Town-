@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useUserLocation } from "@/contexts/LocationContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -82,10 +83,22 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const [zipcode, setZipcode] = useState("");
   const [zipcodeError, setZipcodeError] = useState("");
+  const { location: userLocation } = useUserLocation();
 
   const { data: stats } = useQuery<PlatformStats>({
     queryKey: ["/api/stats"],
   });
+
+  // Dynamic location text based on user's ZIP code
+  const locationText = useMemo(() => {
+    if (userLocation.city) {
+      return userLocation.city;
+    }
+    if (userLocation.neighborhood) {
+      return userLocation.neighborhood;
+    }
+    return "Maryland";
+  }, [userLocation]);
 
   // Try LegiScan API first, fallback to Montgomery County data
   const { data: legiScanBills = [], isLoading: legiScanLoading } = useQuery<any[]>({
@@ -151,7 +164,7 @@ export default function Landing() {
             Track Maryland state legislation that impacts your community
           </p>
           <p className="text-2xl md:text-3xl text-foreground mb-4 font-medium">
-            What's happening in Annapolis?
+            What's happening in {locationText}?
           </p>
           <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
             Real-time access to Maryland House and Senate bills.
