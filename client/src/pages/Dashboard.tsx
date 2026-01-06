@@ -42,38 +42,11 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Try LegiScan API first, fallback to database bills
-  const { data: legiScanBills = [], isLoading: legiScanLoading } = useQuery<any[]>({
-    queryKey: ["/api/legiscan/bills"],
-    retry: 1,
-  });
-
-  const { data: dbBills = [], isLoading: dbLoading } = useQuery<Bill[]>({
+  // Fetch bills from unified endpoint (handles both LegiScan and database)
+  const { data: bills = [], isLoading } = useQuery<Bill[]>({
     queryKey: ["/api/bills"],
-    enabled: legiScanBills.length === 0 && !legiScanLoading,
+    retry: 2,
   });
-
-  // Convert LegiScan bills to our Bill format
-  const bills = useMemo(() => {
-    if (legiScanBills.length > 0) {
-      return legiScanBills.map((bill: any) => ({
-        id: bill.billId,
-        billNumber: bill.billNumber,
-        title: bill.title,
-        summary: bill.description,
-        status: bill.status,
-        topic: 'community' as Topic, // Default topic, could be enhanced with AI categorization
-        voteDate: bill.statusDate,
-        supportVotes: 0,
-        opposeVotes: 0,
-        sourceUrl: bill.url,
-        sponsors: bill.sponsors || [],
-      }));
-    }
-    return dbBills;
-  }, [legiScanBills, dbBills]);
-
-  const isLoading = legiScanLoading || dbLoading;
 
   const filteredBills = useMemo(() => {
     return bills
@@ -119,9 +92,9 @@ export default function Dashboard() {
             Maryland State Legislation
           </h1>
           <p className="text-lg text-muted-foreground">
-            {legiScanBills.length > 0
+            {bills.length > 0
               ? `Tracking ${bills.length} bills from the Maryland General Assembly`
-              : "Bills affecting your community in Maryland"
+              : "Loading bills from Maryland legislature..."
             }
           </p>
         </div>
