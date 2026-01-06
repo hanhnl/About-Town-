@@ -15,6 +15,8 @@ export async function registerRoutes(
     try {
       const { topic, status, zipcode, search } = req.query;
 
+      console.log('📊 /api/bills called - Database configured:', isDatabaseConfigured(), 'LegiScan configured:', isLegiScanConfigured());
+
       // Try database first if configured
       if (isDatabaseConfigured()) {
         try {
@@ -24,18 +26,22 @@ export async function registerRoutes(
             zipcode: typeof zipcode === 'string' ? zipcode : undefined,
             search: typeof search === 'string' ? search : undefined
           });
+          console.log('✅ Returning', bills.length, 'bills from database');
           return res.json(bills);
         } catch (dbError) {
-          console.log('Database error fetching bills, falling back to LegiScan:', dbError);
+          console.log('❌ Database error, falling back to LegiScan:', dbError);
         }
       }
 
       // Fallback to LegiScan if database not available
       if (isLegiScanConfigured()) {
+        console.log('🔍 Fetching bills from LegiScan API...');
         const legiScanBills = await getMarylandBills({
           limit: 50,
           search: typeof search === 'string' ? search : undefined
         });
+        console.log('✅ Got', legiScanBills.length, 'bills from LegiScan');
+
         // Convert LegiScan format to our Bill format
         const bills = legiScanBills.map(bill => ({
           id: bill.billId,
@@ -53,9 +59,10 @@ export async function registerRoutes(
       }
 
       // No data source available
+      console.log('⚠️  No data source available (no database, no LegiScan API key)');
       res.json([]);
     } catch (error) {
-      console.error('Error fetching bills:', error);
+      console.error('❌ Error fetching bills:', error);
       res.json([]); // Return empty array instead of error
     }
   });
