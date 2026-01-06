@@ -69,15 +69,8 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  private ensureDb() {
-    if (!db) {
-      throw new Error('Database not configured - DATABASE_URL not set');
-    }
-    return db;
-  }
-
   async getUser(id: number): Promise<User | undefined> {
-    const [user] = await this.ensureDb().select().from(users).where(eq(users.id, id));
+    const [user] = await db!.select().from(users).where(eq(users.id, id));
     return user || undefined;
   }
 
