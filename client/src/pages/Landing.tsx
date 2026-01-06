@@ -117,15 +117,19 @@ export default function Landing() {
       setZipcodeError("Please enter a valid 5-digit ZIP code");
       return;
     }
-    
+
     try {
-      const response = await fetch(`/api/zipcodes/lookup/${zipcode}`);
-      const data = await response.json();
-      
+      // Store zipcode in localStorage and navigate
+      localStorage.setItem("townsquare-zipcode", zipcode);
+
+      // Try to fetch zipcode data (best effort)
+      fetch(`/api/zipcodes/lookup/${zipcode}`).catch(() => {});
+
       // Always navigate to dashboard - we support all Maryland zip codes
       setLocation("/dashboard");
     } catch {
-      setZipcodeError("Error checking ZIP code. Please try again.");
+      // Even on error, navigate to dashboard
+      setLocation("/dashboard");
     }
   };
 
