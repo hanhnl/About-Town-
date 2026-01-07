@@ -13,31 +13,40 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Diagnostic endpoint - visit this to check if LegiScan is working
   app.get("/api/debug/status", async (_req, res) => {
-    const status = {
-      databaseConfigured: isDatabaseConfigured(),
-      legiScanConfigured: isLegiScanConfigured(),
-      environment: process.env.NODE_ENV || 'unknown',
-      timestamp: new Date().toISOString(),
-    };
+    try {
+      const status = {
+        databaseConfigured: isDatabaseConfigured(),
+        legiScanConfigured: isLegiScanConfigured(),
+        environment: process.env.NODE_ENV || 'unknown',
+        timestamp: new Date().toISOString(),
+      };
 
-    // Try to fetch a bill from LegiScan to test the connection
-    let legiScanTest = { working: false, error: null as any, billCount: 0 };
-    if (isLegiScanConfigured()) {
-      try {
-        const bills = await getMarylandBills({ limit: 5 });
-        legiScanTest = { working: true, error: null, billCount: bills.length };
-      } catch (error) {
-        legiScanTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
+      // Try to fetch a bill from LegiScan to test the connection
+      let legiScanTest = { working: false, error: null as any, billCount: 0 };
+      if (isLegiScanConfigured()) {
+        try {
+          const bills = await getMarylandBills({ limit: 5 });
+          legiScanTest = { working: true, error: null, billCount: bills.length };
+        } catch (error) {
+          legiScanTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
+        }
       }
-    }
 
-    res.json({
-      ...status,
-      legiScan: legiScanTest,
-      message: isLegiScanConfigured()
-        ? (legiScanTest.working ? '✅ LegiScan API is working!' : '❌ LegiScan API key set but requests failing')
-        : '⚠️  LegiScan API key not set in environment variables'
-    });
+      res.json({
+        ...status,
+        legiScan: legiScanTest,
+        message: isLegiScanConfigured()
+          ? (legiScanTest.working ? '✅ LegiScan API is working!' : '❌ LegiScan API key set but requests failing')
+          : '⚠️  LegiScan API key not set in environment variables'
+      });
+    } catch (error) {
+      console.error('Debug endpoint error:', error);
+      res.status(500).json({
+        error: 'Debug endpoint failed',
+        message: error instanceof Error ? error.message : String(error),
+        timestamp: new Date().toISOString()
+      });
+    }
   });
 
   app.get("/api/bills", async (req, res) => {
