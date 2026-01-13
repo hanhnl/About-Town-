@@ -1,16 +1,21 @@
-import { db } from "./db";
+import { db, isDatabaseConfigured } from "./db";
 import { bills, councilMembers, billTimeline, councilVotes, campaignContributions, jurisdictions, zipcodes, amendments } from "@shared/schema";
 
 export async function seed() {
+  if (!isDatabaseConfigured()) {
+    console.log("⚠️  Database not configured - skipping seed");
+    return;
+  }
+
   console.log("Seeding database with Montgomery County data...");
 
-  const existingMembers = await db.select().from(councilMembers);
+  const existingMembers = await db!.select().from(councilMembers);
   if (existingMembers.length > 0) {
     console.log("Database already seeded, skipping...");
     return;
   }
 
-  const [mcJurisdiction] = await db.insert(jurisdictions).values({
+  const [mcJurisdiction] = await db!.insert(jurisdictions).values({
     name: "Montgomery County",
     slug: "montgomery-county-md",
     type: "county",
@@ -44,7 +49,7 @@ export async function seed() {
     { zipcode: "20879", city: "Gaithersburg", neighborhoods: ["Montgomery Village"] },
   ];
 
-  await db.insert(zipcodes).values(
+  await db!.insert(zipcodes).values(
     silverSpringZipcodes.map(z => ({
       zipcode: z.zipcode,
       city: z.city,
@@ -55,7 +60,7 @@ export async function seed() {
   );
   console.log(`Created ${silverSpringZipcodes.length} Montgomery County zipcodes`);
 
-  const insertedCouncilMembers = await db.insert(councilMembers).values([
+  const insertedCouncilMembers = await db!.insert(councilMembers).values([
     {
       jurisdictionId: mcJurisdiction.id,
       name: "Natali Fani-González",
@@ -192,7 +197,7 @@ export async function seed() {
 
   console.log(`Inserted ${insertedCouncilMembers.length} council members`);
 
-  const insertedBills = await db.insert(bills).values([
+  const insertedBills = await db!.insert(bills).values([
     {
       jurisdictionId: mcJurisdiction.id,
       billNumber: "University-Blvd-2025",
@@ -300,7 +305,7 @@ export async function seed() {
   const consumerBill = insertedBills.find(b => b.billNumber === "Bill-6-25");
   
   if (uniBlvdBill) {
-    await db.insert(billTimeline).values([
+    await db!.insert(billTimeline).values([
       { billId: uniBlvdBill.id, date: "2024-06-15", title: "Plan Initiated", description: "Montgomery Planning begins community outreach", status: "completed", type: "introduced" },
       { billId: uniBlvdBill.id, date: "2024-09-20", title: "Community Meetings", description: "Series of 6 community meetings held along corridor", status: "completed", type: "hearing" },
       { billId: uniBlvdBill.id, date: "2025-03-15", title: "Draft Plan Released", description: "Draft plan published for 60-day public comment", status: "completed", type: "committee" },
@@ -315,7 +320,7 @@ export async function seed() {
       const vote = ["Natali Fani-González", "Marilyn Balcombe", "Andrew Friedson", "Dawn Luedtke", 
         "Laurie-Anne Sayles", "Will Jawando", "Sidney Katz", "Kate Stewart", "Gabe Albornoz"].includes(member.name) 
         ? "yes" : "no";
-      await db.insert(councilVotes).values({
+      await db!.insert(councilVotes).values({
         billId: uniBlvdBill.id,
         councilMemberId: member.id,
         vote
@@ -325,7 +330,7 @@ export async function seed() {
   }
 
   for (const member of insertedCouncilMembers) {
-    await db.insert(campaignContributions).values([
+    await db!.insert(campaignContributions).values([
       { councilMemberId: member.id, donorCategory: "Individual Contributions", amount: Math.floor(Math.random() * 50000) + 30000, percentage: 45, cycle: "2022" },
       { councilMemberId: member.id, donorCategory: "Small Donor Match", amount: Math.floor(Math.random() * 40000) + 20000, percentage: 25, cycle: "2022" },
       { councilMemberId: member.id, donorCategory: "Labor Unions", amount: Math.floor(Math.random() * 20000) + 10000, percentage: 15, cycle: "2022" },
@@ -337,7 +342,7 @@ export async function seed() {
 
   const zoneBill = insertedBills.find(b => b.billNumber === "ZTA-25-02");
   if (zoneBill) {
-    await db.insert(amendments).values([
+    await db!.insert(amendments).values([
       {
         billId: zoneBill.id,
         amendmentNumber: "ZTA-25-02-A1",
@@ -391,7 +396,7 @@ export async function seed() {
   }
 
   if (uniBlvdBill) {
-    await db.insert(amendments).values([
+    await db!.insert(amendments).values([
       {
         billId: uniBlvdBill.id,
         amendmentNumber: "UB-2025-A1",

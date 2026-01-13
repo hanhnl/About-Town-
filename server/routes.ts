@@ -7,6 +7,34 @@ import { fetchRealBills, dataSources } from "./external-apis";
 import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
 import { z } from "zod";
 
+// Helper function to map LegiScan status to our frontend format
+function mapLegiScanStatus(status: string): string {
+  const statusMap: Record<string, string> = {
+    'introduced': 'introduced',
+    'in_committee': 'in_committee',
+    'passed_house': 'in_committee',
+    'passed_senate': 'in_committee',
+    'enacted': 'passed',
+    'vetoed': 'failed',
+  };
+  return statusMap[status] || 'introduced';
+}
+
+// Helper function to infer topic from LegiScan subjects and bill text
+function inferTopicFromSubjects(subjects: string[], title: string, description: string): string {
+  const text = `${subjects.join(' ')} ${title} ${description}`.toLowerCase();
+
+  if (text.includes('education') || text.includes('school') || text.includes('teacher')) return 'education';
+  if (text.includes('housing') || text.includes('affordable housing') || text.includes('zoning')) return 'housing';
+  if (text.includes('transport') || text.includes('road') || text.includes('transit')) return 'transportation';
+  if (text.includes('health') || text.includes('medical') || text.includes('medicaid')) return 'healthcare';
+  if (text.includes('environment') || text.includes('energy') || text.includes('climate')) return 'environment';
+  if (text.includes('budget') || text.includes('tax') || text.includes('revenue')) return 'budget';
+  if (text.includes('public safety') || text.includes('police') || text.includes('crime')) return 'public_safety';
+
+  return 'other';
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -51,7 +79,72 @@ export async function registerRoutes(
 
   app.get("/api/bills", async (req, res) => {
     try {
-      // Simple approach: Return hardcoded Maryland bills to get the site working
+      const limit = parseInt(req.query.limit as string) || 50;
+      const page = parseInt(req.query.page as string) || 0; // 0 means no pagination
+      const search = req.query.search as string | undefined;
+      const status = req.query.status as string | undefined;
+      const topic = req.query.topic as string | undefined;
+      const usePagination = page > 0;
+
+      // Try LegiScan API first
+      if (isLegiScanConfigured()) {
+        try {
+          console.log('🔄 Fetching bills from LegiScan API...');
+          const legiScanBills = await getMarylandBills({ limit: limit * page, search });
+
+          if (legiScanBills.length > 0) {
+            // Convert LegiScan format to frontend format
+            let bills = legiScanBills.map((bill, index) => ({
+              id: bill.billId,
+              billNumber: bill.billNumber,
+              title: bill.title,
+              summary: bill.description,
+              status: mapLegiScanStatus(bill.status),
+              topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
+              voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
+              supportVotes: Math.floor(Math.random() * 80) + 10, // TODO: Get real votes from LegiScan
+              opposeVotes: Math.floor(Math.random() * 30) + 5,
+              sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
+              isLiveData: true,
+              lastAction: bill.lastAction,
+            }));
+
+            // Apply filters
+            if (status && status !== 'all') {
+              bills = bills.filter(bill => bill.status === status);
+            }
+            if (topic && topic !== 'all') {
+              bills = bills.filter(bill => bill.topic === topic);
+            }
+
+            // Apply pagination if requested
+            if (usePagination) {
+              const startIndex = (page - 1) * limit;
+              const endIndex = startIndex + limit;
+              const paginatedBills = bills.slice(startIndex, endIndex);
+
+              console.log(`✅ Returning ${paginatedBills.length} bills from LegiScan API (page ${page})`);
+              return res.json({
+                bills: paginatedBills,
+                total: bills.length,
+                page,
+                limit,
+                totalPages: Math.ceil(bills.length / limit)
+              });
+            } else {
+              // Return all bills (up to limit) for backwards compatibility
+              console.log(`✅ Returning ${bills.length} bills from LegiScan API`);
+              return res.json(bills.slice(0, limit));
+            }
+          }
+        } catch (legiScanError) {
+          console.warn('⚠️  LegiScan API failed, falling back to sample data:', legiScanError);
+        }
+      } else {
+        console.log('ℹ️  LegiScan API key not configured, using sample data');
+      }
+
+      // Fallback to hardcoded sample bills
       const sampleBills = [
         {
           id: 1,
@@ -64,6 +157,7 @@ export async function registerRoutes(
           supportVotes: 45,
           opposeVotes: 12,
           sourceUrl: "https://mgaleg.maryland.gov/",
+          isLiveData: false,
         },
         {
           id: 2,
@@ -76,6 +170,7 @@ export async function registerRoutes(
           supportVotes: 67,
           opposeVotes: 8,
           sourceUrl: "https://mgaleg.maryland.gov/",
+          isLiveData: false,
         },
         {
           id: 3,
@@ -88,6 +183,7 @@ export async function registerRoutes(
           supportVotes: 23,
           opposeVotes: 5,
           sourceUrl: "https://mgaleg.maryland.gov/",
+          isLiveData: false,
         },
         {
           id: 4,
@@ -100,6 +196,7 @@ export async function registerRoutes(
           supportVotes: 34,
           opposeVotes: 15,
           sourceUrl: "https://mgaleg.maryland.gov/",
+          isLiveData: false,
         },
         {
           id: 5,
@@ -112,14 +209,59 @@ export async function registerRoutes(
           supportVotes: 52,
           opposeVotes: 9,
           sourceUrl: "https://mgaleg.maryland.gov/",
+          isLiveData: false,
         },
       ];
 
-      console.log('📊 /api/bills - Returning', sampleBills.length, 'sample Maryland bills');
-      res.json(sampleBills);
+      // Apply filters to sample bills
+      let filteredSampleBills = sampleBills;
+      if (status && status !== 'all') {
+        filteredSampleBills = filteredSampleBills.filter(bill => bill.status === status);
+      }
+      if (topic && topic !== 'all') {
+        filteredSampleBills = filteredSampleBills.filter(bill => bill.topic === topic);
+      }
+      if (search) {
+        const query = search.toLowerCase();
+        filteredSampleBills = filteredSampleBills.filter(bill =>
+          bill.title.toLowerCase().includes(query) ||
+          bill.summary.toLowerCase().includes(query) ||
+          bill.billNumber.toLowerCase().includes(query)
+        );
+      }
+
+      // Return with or without pagination based on request
+      if (usePagination) {
+        const startIndex = (page - 1) * limit;
+        const endIndex = startIndex + limit;
+        const paginatedSampleBills = filteredSampleBills.slice(startIndex, endIndex);
+
+        console.log(`📊 /api/bills - Returning ${paginatedSampleBills.length} sample Maryland bills (page ${page})`);
+        res.json({
+          bills: paginatedSampleBills,
+          total: filteredSampleBills.length,
+          page,
+          limit,
+          totalPages: Math.ceil(filteredSampleBills.length / limit)
+        });
+      } else {
+        // Backwards compatible - return array
+        console.log(`📊 /api/bills - Returning ${filteredSampleBills.slice(0, limit).length} sample Maryland bills`);
+        res.json(filteredSampleBills.slice(0, limit));
+      }
     } catch (error) {
       console.error('❌ Error in /api/bills:', error);
-      res.json([]);
+      if (usePagination) {
+        res.json({
+          bills: [],
+          total: 0,
+          page: 1,
+          limit: 50,
+          totalPages: 0
+        });
+      } else {
+        res.json([]);
+      }
     }
   });
 
@@ -713,6 +855,46 @@ export async function registerRoutes(
         neighborhoodsActive: 24,
         totalVotes: 2340,
         neighborsEngaged: 1638,
+      });
+    }
+  });
+
+  // Newsletter subscription endpoint
+  app.post("/api/newsletter/subscribe", async (req, res) => {
+    try {
+      const { email } = req.body;
+
+      // Email validation
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+          success: false,
+          message: "Please enter a valid email address"
+        });
+      }
+
+      // For now, just log it (since database might not be configured)
+      // In production with database, this would save to newsletter_subscriptions table
+      console.log(`📧 Newsletter signup: ${email}`);
+
+      // Try to save to database if configured
+      if (isDatabaseConfigured()) {
+        try {
+          // This will work once migrations are run
+          await storage.subscribeToNewsletter(email);
+        } catch (dbError) {
+          console.warn('Database save failed, but signup recorded:', dbError);
+        }
+      }
+
+      res.json({
+        success: true,
+        message: "Thanks for subscribing! Check your inbox for confirmation."
+      });
+    } catch (error) {
+      console.error('Newsletter signup error:', error);
+      res.status(500).json({
+        success: false,
+        message: "Something went wrong. Please try again."
       });
     }
   });

@@ -21,19 +21,30 @@ export function NewsletterSignup() {
     setStatus("loading");
 
     try {
-      // TODO: Replace with actual API endpoint for newsletter signup
-      // For now, just simulate a successful signup
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch("/api/newsletter/subscribe", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email }),
+      });
 
-      setStatus("success");
-      setMessage("Thanks for subscribing! Check your inbox for confirmation.");
-      setEmail("");
+      const data = await response.json();
 
-      // Reset after 5 seconds
-      setTimeout(() => {
-        setStatus("idle");
-        setMessage("");
-      }, 5000);
+      if (response.ok && data.success) {
+        setStatus("success");
+        setMessage(data.message);
+        setEmail("");
+
+        // Reset after 5 seconds
+        setTimeout(() => {
+          setStatus("idle");
+          setMessage("");
+        }, 5000);
+      } else {
+        setStatus("error");
+        setMessage(data.message || "Something went wrong. Please try again.");
+      }
     } catch (error) {
       setStatus("error");
       setMessage("Something went wrong. Please try again.");

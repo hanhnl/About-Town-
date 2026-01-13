@@ -5,6 +5,7 @@ import { MessageSquare, ThumbsUp, ThumbsDown, Calendar, ExternalLink } from "luc
 import { StatusBadge, type BillStatus } from "./StatusBadge";
 import { TopicBadge, type Topic } from "./TopicBadge";
 import { StarButton } from "./StarButton";
+import { ShareButton } from "./ShareButton";
 
 export interface Bill {
   id: string;
@@ -51,6 +52,14 @@ export function BillCard({ bill }: BillCardProps) {
           </div>
           <div className="flex items-center gap-2">
             <TopicBadge topic={bill.topic} />
+            <ShareButton
+              title={bill.title}
+              billNumber={bill.billNumber}
+              url={`${typeof window !== 'undefined' ? window.location.origin : ''}/bill/${bill.id}`}
+              description={bill.summary}
+              variant="ghost"
+              size="sm"
+            />
             <StarButton billId={parseInt(bill.id)} />
           </div>
         </div>

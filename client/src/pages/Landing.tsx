@@ -100,15 +100,10 @@ export default function Landing() {
     return "Maryland";
   }, [userLocation]);
 
-  // Try LegiScan API first, fallback to Montgomery County data
-  const { data: legiScanBills = [], isLoading: legiScanLoading } = useQuery<any[]>({
-    queryKey: ["/api/legiscan/bills"],
+  // Fetch bills from unified API endpoint
+  const { data: allBills = [], isLoading: billsLoading } = useQuery<any[]>({
+    queryKey: ["/api/bills"],
     retry: 1,
-  });
-
-  const { data: realBills = [], isLoading: billsLoading } = useQuery<RealBill[]>({
-    queryKey: ["/api/real-bills"],
-    enabled: legiScanBills.length === 0 && !legiScanLoading,
   });
 
   const handleZipcodeSubmit = async (e: React.FormEvent) => {
@@ -133,26 +128,24 @@ export default function Landing() {
     }
   };
 
-  // Use LegiScan bills if available, otherwise use Montgomery County bills
-  const allBills = legiScanBills.length > 0
-    ? legiScanBills.map(bill => ({
-        billNumber: bill.billNumber,
-        title: bill.title,
-        status: bill.status,
-        sponsors: bill.sponsors?.map((s: any) => s.name) || [],
-        coSponsors: [],
-        introductionDate: bill.statusDate,
-        yesVotes: [],
-        noVotes: [],
-        finalVote: null,
-        enactedBillUrl: bill.url,
-        sourceUrl: bill.url,
-        isLiveData: true,
-      }))
-    : realBills;
+  // Convert bills to RealBill format for display
+  const displayBills: RealBill[] = allBills.slice(0, 5).map(bill => ({
+    billNumber: bill.billNumber,
+    title: bill.title,
+    status: bill.status,
+    sponsors: bill.sponsors?.map((s: any) => s.name) || [],
+    coSponsors: [],
+    introductionDate: bill.voteDate || null,
+    yesVotes: Array(bill.supportVotes || 0).fill("Support"),
+    noVotes: Array(bill.opposeVotes || 0).fill("Oppose"),
+    finalVote: null,
+    enactedBillUrl: bill.sourceUrl,
+    sourceUrl: bill.sourceUrl,
+    isLiveData: bill.isLiveData ?? false,
+  }));
 
-  const displayedBills = allBills.slice(0, 5);
-  const hasLiveData = legiScanBills.length > 0 || displayedBills.some(bill => bill.isLiveData);
+  const displayedBills = displayBills;
+  const hasLiveData = displayedBills.some(bill => bill.isLiveData);
 
   return (
     <div className="min-h-screen bg-background">
