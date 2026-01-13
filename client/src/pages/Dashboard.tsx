@@ -7,7 +7,8 @@ import { BillCard, type Bill as BillCardType } from "@/components/BillCard";
 import type { BillStatus } from "@/components/StatusBadge";
 import type { Topic } from "@/components/TopicBadge";
 import type { Bill } from "@shared/schema";
-import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Zap, FileText } from "lucide-react";
 
 function mapBillToCardFormat(bill: Bill): BillCardType {
   const statusMap: Record<string, BillStatus> = {
@@ -84,13 +85,28 @@ export default function Dashboard() {
     );
   }
 
+  const hasLiveData = bills.some((bill: any) => bill.isLiveData);
+
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-          <h1 className="text-3xl font-semibold text-foreground mb-2" data-testid="text-page-title">
-            Maryland State Legislation
-          </h1>
+          <div className="flex items-center gap-3 mb-3">
+            <h1 className="text-3xl font-semibold text-foreground" data-testid="text-page-title">
+              Maryland State Legislation
+            </h1>
+            {hasLiveData ? (
+              <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 gap-1">
+                <Zap className="h-3 w-3" />
+                Live Data
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <FileText className="h-3 w-3" />
+                Sample Data
+              </Badge>
+            )}
+          </div>
           <p className="text-lg text-muted-foreground">
             {bills.length > 0
               ? `Tracking ${bills.length} bills from the Maryland General Assembly`

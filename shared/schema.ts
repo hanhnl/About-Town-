@@ -257,6 +257,14 @@ export const billStarsRelations = relations(billStars, ({ one }) => ({
   }),
 }));
 
+export const newsletterSubscriptions = pgTable("newsletter_subscriptions", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  isActive: boolean("is_active").default(true),
+  subscribedAt: timestamp("subscribed_at").defaultNow(),
+  unsubscribedAt: timestamp("unsubscribed_at"),
+});
+
 export const insertJurisdictionSchema = createInsertSchema(jurisdictions).omit({ id: true });
 export const insertZipcodeSchema = createInsertSchema(zipcodes).omit({ id: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -269,6 +277,7 @@ export const insertBillTimelineSchema = createInsertSchema(billTimeline).omit({ 
 export const insertCouncilVoteSchema = createInsertSchema(councilVotes).omit({ id: true });
 export const insertAmendmentSchema = createInsertSchema(amendments).omit({ id: true });
 export const insertBillStarSchema = createInsertSchema(billStars).omit({ id: true, createdAt: true });
+export const insertNewsletterSubscriptionSchema = createInsertSchema(newsletterSubscriptions).omit({ id: true, subscribedAt: true });
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -294,3 +303,5 @@ export type InsertAmendment = z.infer<typeof insertAmendmentSchema>;
 export type Amendment = typeof amendments.$inferSelect;
 export type InsertBillStar = z.infer<typeof insertBillStarSchema>;
 export type BillStar = typeof billStars.$inferSelect;
+export type InsertNewsletterSubscription = z.infer<typeof insertNewsletterSubscriptionSchema>;
+export type NewsletterSubscription = typeof newsletterSubscriptions.$inferSelect;

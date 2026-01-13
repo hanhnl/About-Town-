@@ -1,6 +1,7 @@
 import {
   users, bills, councilMembers, comments, userVotes, campaignContributions,
   councilVotes, billTimeline, relatedBills, jurisdictions, zipcodes, amendments, billStars,
+  newsletterSubscriptions,
   type User, type InsertUser,
   type Bill, type InsertBill,
   type CouncilMember, type InsertCouncilMember,
@@ -12,7 +13,8 @@ import {
   type Jurisdiction, type InsertJurisdiction,
   type Zipcode, type InsertZipcode,
   type Amendment, type InsertAmendment,
-  type BillStar, type InsertBillStar
+  type BillStar, type InsertBillStar,
+  type NewsletterSubscription, type InsertNewsletterSubscription
 } from "@shared/schema";
 import { db, isDatabaseConfigured } from "./db";
 import { eq, ilike, and, or, desc, sql } from "drizzle-orm";
@@ -66,6 +68,8 @@ export interface IStorage {
   isStarred(userId: number, billId: number): Promise<boolean>;
   getStarredBills(userId: number): Promise<(BillStar & { bill: Bill })[]>;
   getUserComments(userId: number): Promise<(Comment & { bill?: Bill })[]>;
+
+  subscribeToNewsletter(email: string): Promise<NewsletterSubscription>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -326,11 +330,22 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(bills, eq(comments.billId, bills.id))
       .where(eq(comments.userId, userId))
       .orderBy(desc(comments.timestamp));
-    
+
     return results.map(r => ({
       ...r.comments,
       bill: r.bills || undefined
     }));
+  }
+
+  async subscribeToNewsletter(email: string): Promise<NewsletterSubscription> {
+    const [subscription] = await db!.insert(newsletterSubscriptions)
+      .values({ email, isActive: true })
+      .onConflictDoUpdate({
+        target: newsletterSubscriptions.email,
+        set: { isActive: true, unsubscribedAt: null }
+      })
+      .returning();
+    return subscription;
   }
 }
 
@@ -483,6 +498,17 @@ export class NoOpStorage implements IStorage {
 
   async getUserComments(_userId: number): Promise<(Comment & { bill?: Bill })[]> {
     return [];
+  }
+
+  async subscribeToNewsletter(email: string): Promise<NewsletterSubscription> {
+    // Return a mock subscription when database is not configured
+    return {
+      id: 1,
+      email,
+      isActive: true,
+      subscribedAt: new Date(),
+      unsubscribedAt: null
+    };
   }
 }
 
