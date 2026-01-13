@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
@@ -62,29 +63,48 @@ app.use((req, res, next) => {
 let routesInitialized = false;
 async function initializeApp() {
   if (!routesInitialized) {
-    // Only run seed in development or if explicitly needed
-    if (process.env.SEED_DATABASE === "true") {
-      const { seed } = await import("../server/seed");
-      await seed();
+    try {
+      console.log('Initializing serverless function...');
+
+      // Only run seed in development or if explicitly needed
+      if (process.env.SEED_DATABASE === "true") {
+        console.log('Seeding database...');
+        const { seed } = await import("../server/seed");
+        await seed();
+      }
+
+      console.log('Registering routes...');
+      await registerRoutes(httpServer, app);
+
+      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+        const status = err.status || err.statusCode || 500;
+        const message = err.message || "Internal Server Error";
+
+        res.status(status).json({ message });
+        console.error('Route error:', err);
+      });
+
+      routesInitialized = true;
+      console.log('Serverless function initialized successfully');
+    } catch (error) {
+      console.error('Error during app initialization:', error);
+      throw error;
     }
-
-    await registerRoutes(httpServer, app);
-
-    app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-      const status = err.status || err.statusCode || 500;
-      const message = err.message || "Internal Server Error";
-
-      res.status(status).json({ message });
-      console.error(err);
-    });
-
-    routesInitialized = true;
   }
   return app;
 }
 
 // Vercel serverless function handler
 export default async function handler(req: any, res: any) {
-  const app = await initializeApp();
-  return app(req, res);
+  try {
+    const app = await initializeApp();
+    return app(req, res);
+  } catch (error) {
+    console.error('Serverless function initialization error:', error);
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+    });
+  }
 }
