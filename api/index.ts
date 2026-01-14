@@ -1,8 +1,8 @@
 // Note: Vercel automatically injects environment variables
 // dotenv is only needed for local development
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
+import { registerRoutes } from "./server/routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -88,6 +88,7 @@ async function initializeApp() {
 
       console.log('[Vercel] Registering routes...');
       await registerRoutes(httpServer, app);
+      console.log('[Vercel] Routes registered successfully');
 
       app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
@@ -127,12 +128,16 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    // Send detailed error response
-    return res.status(500).json({
-      error: 'Serverless Function Failed',
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      timestamp: new Date().toISOString(),
-      hint: 'Check Vercel function logs for details'
-    });
+    // Send detailed error response as JSON (not HTML)
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = 500;
+      return res.end(JSON.stringify({
+        error: 'Serverless Function Failed',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        timestamp: new Date().toISOString(),
+        hint: 'Check Vercel function logs for details'
+      }));
+    }
   }
 }

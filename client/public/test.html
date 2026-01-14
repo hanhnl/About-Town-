@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Page</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px;
+            background: #f0f0f0;
+        }
+        .success {
+            background: #4CAF50;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="success">
+        <h1>✅ Static File Serving Works!</h1>
+        <p>If you can see this, Vercel is serving static files correctly.</p>
+        <p>The problem is likely with the React app or API.</p>
+    </div>
+
+    <script>
+        // Test if JavaScript works
+        console.log('✅ JavaScript is executing');
+
+        // Test API call
+        fetch('/api/health')
+            .then(r => r.json())
+            .then(data => {
+                console.log('✅ API Response:', data);
+                document.body.innerHTML += '<div class="success"><h2>✅ API Works!</h2><pre>' + JSON.stringify(data, null, 2) + '</pre></div>';
+            })
+            .catch(err => {
+                console.error('❌ API Failed:', err);
+                document.body.innerHTML += '<div style="background: #f44336; color: white; padding: 20px; margin-top: 20px; border-radius: 8px;"><h2>❌ API Failed</h2><pre>' + err.message + '</pre></div>';
+            });
+    </script>
+</body>
+</html>
