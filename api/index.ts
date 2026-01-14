@@ -1,7 +1,6 @@
 // Note: Vercel automatically injects environment variables
 // dotenv is only needed for local development
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
 
 const app = express();
@@ -88,6 +87,8 @@ async function initializeApp() {
 
       console.log('[Vercel] Registering routes...');
       try {
+        // Dynamic import to catch any module-level errors
+        const { registerRoutes } = await import("../server/routes");
         await registerRoutes(httpServer, app);
         console.log('[Vercel] Routes registered successfully');
       } catch (routeError) {
