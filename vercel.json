@@ -1,18 +1,4 @@
 {
   "buildCommand": "npx vite build",
-  "outputDirectory": "dist/public",
-  "installCommand": "npm install",
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index"
-    }
-  ],
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "@vercel/node@latest",
-      "memory": 1024,
-      "maxDuration": 10
-    }
-  }
+  "outputDirectory": "dist/public"
 }
