@@ -1,5 +1,5 @@
 import { db, isDatabaseConfigured } from "./db";
-import { bills, councilMembers, billTimeline, councilVotes, campaignContributions, jurisdictions, zipcodes, amendments } from "@shared/schema";
+import { bills, councilMembers, billTimeline, councilVotes, campaignContributions, jurisdictions, zipcodes, amendments } from "../shared/schema";
 
 export async function seed() {
   if (!isDatabaseConfigured()) {

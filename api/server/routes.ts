@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
-import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "@shared/schema";
+import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
 import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
 import { z } from "zod";
