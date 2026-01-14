@@ -2,6 +2,7 @@
 // dotenv is only needed for local development
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
+import { registerRoutes } from "./server/routes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -86,21 +87,8 @@ async function initializeApp() {
       console.log('[Vercel] Skipping database seed (use separate script for production)');
 
       console.log('[Vercel] Registering routes...');
-      try {
-        // Dynamic import to catch any module-level errors
-        // Server files are copied into api/server/ for Vercel deployment
-        const { registerRoutes } = await import("./server/routes");
-        await registerRoutes(httpServer, app);
-        console.log('[Vercel] Routes registered successfully');
-      } catch (routeError) {
-        console.error('[Vercel] ❌ Route registration failed:', routeError);
-        console.error('[Vercel] Error details:', {
-          message: routeError instanceof Error ? routeError.message : String(routeError),
-          stack: routeError instanceof Error ? routeError.stack : 'No stack',
-          name: routeError instanceof Error ? routeError.name : 'Unknown'
-        });
-        throw new Error(`Route registration failed: ${routeError instanceof Error ? routeError.message : String(routeError)}`);
-      }
+      await registerRoutes(httpServer, app);
+      console.log('[Vercel] Routes registered successfully');
 
       app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
