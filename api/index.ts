@@ -1,4 +1,5 @@
-import 'dotenv/config';
+// Note: Vercel automatically injects environment variables
+// dotenv is only needed for local development
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "../server/routes";
 import { createServer } from "http";
@@ -64,30 +65,29 @@ let routesInitialized = false;
 async function initializeApp() {
   if (!routesInitialized) {
     try {
-      console.log('Initializing serverless function...');
+      console.log('[Vercel] Initializing serverless function...');
+      console.log('[Vercel] NODE_ENV:', process.env.NODE_ENV);
+      console.log('[Vercel] LEGISCAN_API_KEY set:', !!process.env.LEGISCAN_API_KEY);
 
-      // Only run seed in development or if explicitly needed
-      if (process.env.SEED_DATABASE === "true") {
-        console.log('Seeding database...');
-        const { seed } = await import("../server/seed");
-        await seed();
-      }
+      // Skip database seeding in production - too slow for serverless
+      // Database should be seeded separately
+      console.log('[Vercel] Skipping database seed (use separate script for production)');
 
-      console.log('Registering routes...');
+      console.log('[Vercel] Registering routes...');
       await registerRoutes(httpServer, app);
 
       app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
-
+        console.error('[Vercel] Route error:', status, message, err);
         res.status(status).json({ message });
-        console.error('Route error:', err);
       });
 
       routesInitialized = true;
-      console.log('Serverless function initialized successfully');
+      console.log('[Vercel] ✅ Serverless function initialized successfully');
     } catch (error) {
-      console.error('Error during app initialization:', error);
+      console.error('[Vercel] ❌ FATAL: Initialization failed:', error);
+      console.error('[Vercel] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw error;
     }
   }
@@ -96,15 +96,30 @@ async function initializeApp() {
 
 // Vercel serverless function handler
 export default async function handler(req: any, res: any) {
+  console.log('[Vercel] Incoming request:', req.method, req.url);
+
   try {
     const app = await initializeApp();
+    console.log('[Vercel] App initialized, processing request...');
     return app(req, res);
   } catch (error) {
-    console.error('Serverless function initialization error:', error);
+    console.error('[Vercel] ❌ Handler error:', error);
+    console.error('[Vercel] Error details:', {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : 'No stack trace',
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        hasLegiscanKey: !!process.env.LEGISCAN_API_KEY,
+        hasDatabaseUrl: !!process.env.DATABASE_URL
+      }
+    });
+
+    // Send detailed error response
     return res.status(500).json({
-      error: 'Internal Server Error',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: process.env.NODE_ENV === 'development' ? (error instanceof Error ? error.stack : undefined) : undefined
+      error: 'Serverless Function Failed',
+      message: error instanceof Error ? error.message : 'Unknown error occurred',
+      timestamp: new Date().toISOString(),
+      hint: 'Check Vercel function logs for details'
     });
   }
 }
