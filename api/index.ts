@@ -1,5 +1,6 @@
 // Note: Vercel automatically injects environment variables
 // dotenv is only needed for local development
+// Version: 2026-01-14 - Production ready with all fixes
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./server/routes";
