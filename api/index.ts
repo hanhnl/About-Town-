@@ -7,6 +7,19 @@ import { createServer } from "http";
 const app = express();
 const httpServer = createServer(app);
 
+// Simple health check that doesn't require initialization
+app.get('/api/health', (_req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: {
+      nodeEnv: process.env.NODE_ENV,
+      hasLegiScanKey: !!process.env.LEGISCAN_API_KEY,
+      hasDatabaseUrl: !!process.env.DATABASE_URL
+    }
+  });
+});
+
 declare module "http" {
   interface IncomingMessage {
     rawBody: unknown;
