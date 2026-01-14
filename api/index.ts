@@ -88,16 +88,8 @@ async function initializeApp() {
       console.log('[Vercel] Registering routes...');
       try {
         // Dynamic import to catch any module-level errors
-        // In production (Vercel), server/ is copied to api/server/ during build
-        // In development, server/ is at ../server/
-        let registerRoutes;
-        try {
-          const routes = await import("./server/routes");
-          registerRoutes = routes.registerRoutes;
-        } catch {
-          const routes = await import("../server/routes");
-          registerRoutes = routes.registerRoutes;
-        }
+        // Server files are copied into api/server/ for Vercel deployment
+        const { registerRoutes } = await import("./server/routes");
         await registerRoutes(httpServer, app);
         console.log('[Vercel] Routes registered successfully');
       } catch (routeError) {
