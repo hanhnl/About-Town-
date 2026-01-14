@@ -87,7 +87,18 @@ async function initializeApp() {
       console.log('[Vercel] Skipping database seed (use separate script for production)');
 
       console.log('[Vercel] Registering routes...');
-      await registerRoutes(httpServer, app);
+      try {
+        await registerRoutes(httpServer, app);
+        console.log('[Vercel] Routes registered successfully');
+      } catch (routeError) {
+        console.error('[Vercel] ❌ Route registration failed:', routeError);
+        console.error('[Vercel] Error details:', {
+          message: routeError instanceof Error ? routeError.message : String(routeError),
+          stack: routeError instanceof Error ? routeError.stack : 'No stack',
+          name: routeError instanceof Error ? routeError.name : 'Unknown'
+        });
+        throw new Error(`Route registration failed: ${routeError instanceof Error ? routeError.message : String(routeError)}`);
+      }
 
       app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
         const status = err.status || err.statusCode || 500;
@@ -127,12 +138,16 @@ export default async function handler(req: any, res: any) {
       }
     });
 
-    // Send detailed error response
-    return res.status(500).json({
-      error: 'Serverless Function Failed',
-      message: error instanceof Error ? error.message : 'Unknown error occurred',
-      timestamp: new Date().toISOString(),
-      hint: 'Check Vercel function logs for details'
-    });
+    // Send detailed error response as JSON (not HTML)
+    if (!res.headersSent) {
+      res.setHeader('Content-Type', 'application/json');
+      res.statusCode = 500;
+      return res.end(JSON.stringify({
+        error: 'Serverless Function Failed',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        timestamp: new Date().toISOString(),
+        hint: 'Check Vercel function logs for details'
+      }));
+    }
   }
 }
