@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "npx vite build && mkdir -p api/server api/shared && cp -r server/* api/server/ && cp -r shared/* api/shared/",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "rewrites": [
@@ -11,8 +11,7 @@
   "functions": {
     "api/**/*.ts": {
       "memory": 1024,
-      "maxDuration": 10,
-      "includeFiles": "{server,shared}/**"
+      "maxDuration": 10
     }
   }
 }
