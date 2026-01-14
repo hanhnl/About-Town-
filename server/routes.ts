@@ -78,13 +78,15 @@ export async function registerRoutes(
   });
 
   app.get("/api/bills", async (req, res) => {
+    // Declare these outside try block so they're accessible in catch
+    const limit = parseInt(req.query.limit as string) || 50;
+    const page = parseInt(req.query.page as string) || 0; // 0 means no pagination
+    const search = req.query.search as string | undefined;
+    const status = req.query.status as string | undefined;
+    const topic = req.query.topic as string | undefined;
+    const usePagination = page > 0;
+
     try {
-      const limit = parseInt(req.query.limit as string) || 50;
-      const page = parseInt(req.query.page as string) || 0; // 0 means no pagination
-      const search = req.query.search as string | undefined;
-      const status = req.query.status as string | undefined;
-      const topic = req.query.topic as string | undefined;
-      const usePagination = page > 0;
 
       // Try LegiScan API first
       if (isLegiScanConfigured()) {
