@@ -377,7 +377,7 @@ export async function getBillDetail(billId: number): Promise<NormalizedBillDetai
       votes: Array.isArray(bill.votes)
         ? bill.votes.map(v => ({
             date: v.date,
-            description: v.desc || v.description || '',
+            description: v.desc || '',
             yea: v.yea || 0,
             nay: v.nay || 0,
             absent: v.absent || 0,
@@ -390,13 +390,13 @@ export async function getBillDetail(billId: number): Promise<NormalizedBillDetai
         ? bill.texts.map(t => ({
             date: t.date,
             type: t.type || 'text',
-            url: t.url || t.state_link || ''
+            url: t.url || ''
           }))
         : [],
       subjects: Array.isArray(bill.subjects)
-        ? bill.subjects.map(s => s.subject_name || s)
+        ? bill.subjects.map(s => s.subject_name || '')
         : [],
-      url: bill.url || '',
+      url: `https://mgaleg.maryland.gov/mgawebsite/Legislation/Details/${bill.bill_number}?ys=${new Date().getFullYear()}`,
       isLiveData: true
     };
   } catch (error) {
