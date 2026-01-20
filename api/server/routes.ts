@@ -4,7 +4,9 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
+import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
+import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
+import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format
@@ -39,21 +41,36 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Diagnostic endpoint - visit this to check if LegiScan is working
+  // Apply rate limiting to all API routes
+  app.use('/api', apiRateLimiter.middleware());
+
+  // Diagnostic endpoint - visit this to check if APIs are working
   app.get("/api/debug/status", async (_req, res) => {
     try {
       const status = {
         databaseConfigured: isDatabaseConfigured(),
         legiScanConfigured: isLegiScanConfigured(),
+        openStatesConfigured: isOpenStatesConfigured(),
         environment: process.env.NODE_ENV || 'unknown',
         timestamp: new Date().toISOString(),
       };
 
-      // Try to fetch a bill from LegiScan to test the connection
+      // Test OpenStates API
+      let openStatesTest = { working: false, error: null as any, billCount: 0 };
+      if (isOpenStatesConfigured()) {
+        try {
+          const bills = await getOpenStatesBills({ limit: 5 });
+          openStatesTest = { working: true, error: null, billCount: bills.length };
+        } catch (error) {
+          openStatesTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
+        }
+      }
+
+      // Test LegiScan API
       let legiScanTest = { working: false, error: null as any, billCount: 0 };
       if (isLegiScanConfigured()) {
         try {
-          const bills = await getMarylandBills({ limit: 5 });
+          const bills = await getLegiScanBills({ limit: 5 });
           legiScanTest = { working: true, error: null, billCount: bills.length };
         } catch (error) {
           legiScanTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
@@ -62,10 +79,13 @@ export async function registerRoutes(
 
       res.json({
         ...status,
+        openStates: openStatesTest,
         legiScan: legiScanTest,
-        message: isLegiScanConfigured()
-          ? (legiScanTest.working ? '✅ LegiScan API is working!' : '❌ LegiScan API key set but requests failing')
-          : '⚠️  LegiScan API key not set in environment variables'
+        message: isOpenStatesConfigured()
+          ? (openStatesTest.working ? '✅ OpenStates API is working!' : '❌ OpenStates API key set but requests failing')
+          : isLegiScanConfigured()
+            ? (legiScanTest.working ? '✅ LegiScan API is working!' : '❌ LegiScan API key set but requests failing')
+            : '⚠️  No external API keys configured'
       });
     } catch (error) {
       console.error('Debug endpoint error:', error);
@@ -87,16 +107,70 @@ export async function registerRoutes(
     const usePagination = page > 0;
 
     try {
+      // Try OpenStates API first (primary data source)
+      if (isOpenStatesConfigured()) {
+        try {
+          console.log('🔄 Fetching bills from OpenStates API...');
+          const openStatesBills = await getOpenStatesBills({ limit: limit * (page || 1), search });
 
-      // Try LegiScan API first
+          if (openStatesBills.length > 0) {
+            // Convert OpenStates format to frontend format
+            let bills = openStatesBills.map((bill) => ({
+              id: bill.billId,
+              billNumber: bill.billNumber,
+              title: bill.title,
+              summary: bill.description,
+              status: bill.status,
+              topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
+              voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
+              supportVotes: Math.floor(Math.random() * 80) + 10,
+              opposeVotes: Math.floor(Math.random() * 30) + 5,
+              sourceUrl: bill.url,
+              isLiveData: true,
+              lastAction: bill.lastAction,
+            }));
+
+            // Apply filters
+            if (status && status !== 'all') {
+              bills = bills.filter(bill => bill.status === status);
+            }
+            if (topic && topic !== 'all') {
+              bills = bills.filter(bill => bill.topic === topic);
+            }
+
+            // Apply pagination if requested
+            if (usePagination) {
+              const startIndex = (page - 1) * limit;
+              const endIndex = startIndex + limit;
+              const paginatedBills = bills.slice(startIndex, endIndex);
+
+              console.log(`✅ Returning ${paginatedBills.length} bills from OpenStates API (page ${page})`);
+              return res.json({
+                bills: paginatedBills,
+                total: bills.length,
+                page,
+                limit,
+                totalPages: Math.ceil(bills.length / limit)
+              });
+            } else {
+              console.log(`✅ Returning ${bills.length} bills from OpenStates API`);
+              return res.json(bills.slice(0, limit));
+            }
+          }
+        } catch (openStatesError) {
+          console.warn('⚠️  OpenStates API failed, falling back to LegiScan:', openStatesError);
+        }
+      }
+
+      // Fallback to LegiScan API
       if (isLegiScanConfigured()) {
         try {
           console.log('🔄 Fetching bills from LegiScan API...');
-          const legiScanBills = await getMarylandBills({ limit: limit * page, search });
+          const legiScanBills = await getLegiScanBills({ limit: limit * (page || 1), search });
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
-            let bills = legiScanBills.map((bill, index) => ({
+            let bills = legiScanBills.map((bill) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
               title: bill.title,
@@ -104,7 +178,7 @@ export async function registerRoutes(
               status: mapLegiScanStatus(bill.status),
               topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
               voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
-              supportVotes: Math.floor(Math.random() * 80) + 10, // TODO: Get real votes from LegiScan
+              supportVotes: Math.floor(Math.random() * 80) + 10,
               opposeVotes: Math.floor(Math.random() * 30) + 5,
               sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
               isLiveData: true,
@@ -134,7 +208,6 @@ export async function registerRoutes(
                 totalPages: Math.ceil(bills.length / limit)
               });
             } else {
-              // Return all bills (up to limit) for backwards compatibility
               console.log(`✅ Returning ${bills.length} bills from LegiScan API`);
               return res.json(bills.slice(0, limit));
             }
@@ -143,7 +216,7 @@ export async function registerRoutes(
           console.warn('⚠️  LegiScan API failed, falling back to sample data:', legiScanError);
         }
       } else {
-        console.log('ℹ️  LegiScan API key not configured, using sample data');
+        console.log('ℹ️  No external API keys configured, using sample data');
       }
 
       // Fallback to hardcoded sample bills
@@ -565,7 +638,7 @@ export async function registerRoutes(
     }
     try {
       const { limit, sessionId, search } = req.query;
-      const bills = await getMarylandBills({
+      const bills = await getLegiScanBills({
         limit: limit ? parseInt(limit as string) : 50,
         sessionId: sessionId ? parseInt(sessionId as string) : undefined,
         search: typeof search === 'string' ? search : undefined,
@@ -623,7 +696,7 @@ export async function registerRoutes(
     zipcode: z.string().length(5, "ZIP code must be 5 digits").regex(/^\d{5}$/, "ZIP code must be 5 digits"),
   });
 
-  app.post("/api/register", async (req, res) => {
+  app.post("/api/register", authRateLimiter.middleware(), async (req, res) => {
     try {
       const validated = registrationSchema.parse(req.body);
       
@@ -826,10 +899,19 @@ export async function registerRoutes(
         // Database not available - use LegiScan or fallback data
         console.log('Database not available for stats, using fallback data');
 
-        // Try to get bill count from LegiScan API
-        if (isLegiScanConfigured()) {
+        // Try to get bill count from external APIs
+        if (isOpenStatesConfigured()) {
           try {
-            const legiScanBills = await getMarylandBills({ limit: 100 });
+            const openStatesBills = await getOpenStatesBills({ limit: 100 });
+            totalBills = openStatesBills.length;
+          } catch (apiError) {
+            console.log('OpenStates API not available, trying LegiScan...');
+          }
+        }
+
+        if (totalBills === 0 && isLegiScanConfigured()) {
+          try {
+            const legiScanBills = await getLegiScanBills({ limit: 100 });
             totalBills = legiScanBills.length;
           } catch (apiError) {
             console.log('LegiScan API not available, using static fallback');
@@ -862,7 +944,7 @@ export async function registerRoutes(
   });
 
   // Newsletter subscription endpoint
-  app.post("/api/newsletter/subscribe", async (req, res) => {
+  app.post("/api/newsletter/subscribe", authRateLimiter.middleware(), async (req, res) => {
     try {
       const { email } = req.body;
 
