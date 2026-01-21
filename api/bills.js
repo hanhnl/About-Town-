@@ -164,7 +164,7 @@ module.exports = async (req, res) => {
   console.log('[BILLS HANDLER] Query params:', req.query);
 
   try {
-    const limit = parseInt(req.query.limit) || 50;
+    const limit = parseInt(req.query.limit) || 20; // Reduced from 50 to avoid timeout
     const debug = req.query.debug === 'true';
 
     console.log('[BILLS HANDLER] Limit:', limit, 'Debug:', debug);
@@ -177,7 +177,19 @@ module.exports = async (req, res) => {
 
     if (liveData && liveData.length > 0) {
       console.log('[BILLS HANDLER] ✅ Returning live data');
-      return res.status(200).json(liveData.slice(0, limit));
+      const response = liveData.slice(0, limit);
+      // Add metadata to first bill for debugging
+      if (response.length > 0 && debug) {
+        return res.status(200).json({
+          _debug: {
+            source: 'OpenStates API',
+            count: response.length,
+            timestamp: new Date().toISOString()
+          },
+          bills: response
+        });
+      }
+      return res.status(200).json(response);
     }
 
     // Fallback to sample data with debug info
