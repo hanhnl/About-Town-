@@ -410,7 +410,7 @@ export default function Landing() {
           <div className="text-center mt-8">
             <p className="text-xs text-muted-foreground mb-4 flex items-center justify-center gap-1">
               <CheckCircle2 className="h-3 w-3 text-green-600" />
-              {legiScanBills.length > 0 ? (
+              {hasLiveData ? (
                 <>
                   Data sourced from Maryland State Legislature via LegiScan
                   <a
