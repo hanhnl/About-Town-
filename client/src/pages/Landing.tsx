@@ -85,8 +85,10 @@ export default function Landing() {
   const [zipcodeError, setZipcodeError] = useState("");
   const { location: userLocation } = useUserLocation();
 
+  // TEMPORARILY DISABLED - Testing frontend without API calls
   const { data: stats } = useQuery<PlatformStats>({
     queryKey: ["/api/stats"],
+    enabled: false, // Disabled temporarily
   });
 
   // Dynamic location text based on user's ZIP code
@@ -100,10 +102,12 @@ export default function Landing() {
     return "Maryland";
   }, [userLocation]);
 
+  // TEMPORARILY DISABLED - Testing frontend without API calls
   // Fetch bills from unified API endpoint
   const { data: allBills = [], isLoading: billsLoading } = useQuery<any[]>({
     queryKey: ["/api/bills"],
     retry: 1,
+    enabled: false, // Disabled temporarily
   });
 
   const handleZipcodeSubmit = async (e: React.FormEvent) => {

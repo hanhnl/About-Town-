@@ -43,10 +43,12 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
+  // TEMPORARILY DISABLED - Testing frontend without API calls
   // Fetch bills from unified endpoint (handles both LegiScan and database)
   const { data: bills = [], isLoading } = useQuery<Bill[]>({
     queryKey: ["/api/bills"],
     retry: 2,
+    enabled: false, // Disabled temporarily
   });
 
   const filteredBills = useMemo(() => {

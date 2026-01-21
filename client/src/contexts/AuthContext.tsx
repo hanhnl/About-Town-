@@ -29,9 +29,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   });
 
+  // TEMPORARILY DISABLED - Testing frontend without API calls
   const { data: userData, isLoading } = useQuery<AuthUser>({
     queryKey: ["/api/users", userId],
-    enabled: !!userId,
+    enabled: false, // Disabled temporarily (was: !!userId)
   });
 
   const user = userData ?? null;
