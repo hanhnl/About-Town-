@@ -117,7 +117,8 @@ async function fetchFromOpenStates(limit) {
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`❌ OpenStates API returned ${response.status}`);
+      const errorText = await response.text();
+      console.error(`❌ OpenStates API returned ${response.status}: ${errorText}`);
       return null;
     }
 
@@ -154,6 +155,7 @@ async function fetchFromOpenStates(limit) {
 module.exports = async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
+    const debug = req.query.debug === 'true';
 
     // Try OpenStates API first
     const liveData = await fetchFromOpenStates(limit);
@@ -162,8 +164,18 @@ module.exports = async (req, res) => {
       return res.status(200).json(liveData.slice(0, limit));
     }
 
-    // Fallback to sample data
+    // Fallback to sample data with debug info
     console.log('📊 Returning sample bills (OpenStates unavailable)');
+
+    if (debug) {
+      return res.status(200).json({
+        debug: true,
+        message: 'OpenStates API failed - check server logs',
+        hasApiKey: !!process.env.OPENSTATES_API_KEY,
+        sampleData: SAMPLE_BILLS
+      });
+    }
+
     res.status(200).json(SAMPLE_BILLS);
   } catch (error) {
     console.error('❌ Bills API error:', error.message);
