@@ -1,7 +1,7 @@
-// Plain JavaScript - CommonJS format for Vercel
+// CommonJS format - should work even with "type": "module"
 module.exports = (req, res) => {
   res.status(200).json({
-    message: 'Hello from CommonJS',
+    message: 'CommonJS test works',
     timestamp: new Date().toISOString()
   });
 };
