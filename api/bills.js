@@ -99,22 +99,20 @@ async function fetchFromOpenStates(limit) {
   try {
     console.log('🔄 Fetching bills from OpenStates API...');
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
     const url = new URL('https://v3.openstates.org/bills');
     url.searchParams.set('jurisdiction', 'Maryland');
     url.searchParams.set('per_page', String(Math.min(limit, 100)));
+
+    console.log('🔄 URL:', url.toString());
 
     const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
         'X-API-Key': apiKey,
       },
-      signal: controller.signal,
     });
 
-    clearTimeout(timeoutId);
+    console.log('✅ Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
