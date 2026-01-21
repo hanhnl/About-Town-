@@ -1,15 +1,70 @@
+// ============================================================================
+// IMPORT-TIME LOGGING (executes when module is loaded)
+// ============================================================================
+console.log('[IMPORT] 🟡 api/index.ts - Module import starting...');
+console.log('[IMPORT] Timestamp:', new Date().toISOString());
+console.log('[IMPORT] Node version:', process.version);
+console.log('[IMPORT] Environment:', process.env.NODE_ENV || 'unknown');
+
 // Note: Vercel automatically injects environment variables
 // dotenv is only needed for local development
-import express, { type Request, Response, NextFunction } from "express";
-import { createServer } from "http";
-import { registerRoutes } from "./server/routes";
-import { validateEnvVariables } from "./server/api-utils";
 
-const app = express();
-const httpServer = createServer(app);
+try {
+  console.log('[IMPORT] 🔵 Importing express...');
+  var express = require("express");
+  console.log('[IMPORT] ✅ Express imported successfully');
+} catch (error) {
+  console.error('[IMPORT] ❌ FATAL: Failed to import express:', error);
+  throw error;
+}
+
+try {
+  console.log('[IMPORT] 🔵 Importing http...');
+  var http = require("http");
+  console.log('[IMPORT] ✅ HTTP imported successfully');
+} catch (error) {
+  console.error('[IMPORT] ❌ FATAL: Failed to import http:', error);
+  throw error;
+}
+
+try {
+  console.log('[IMPORT] 🔵 Importing ./server/routes...');
+  var routesModule = require("./server/routes");
+  console.log('[IMPORT] ✅ Routes imported successfully');
+} catch (error) {
+  console.error('[IMPORT] ❌ FATAL: Failed to import routes:', error);
+  console.error('[IMPORT] This is an IMPORT-TIME CRASH');
+  console.error('[IMPORT] Possible causes:');
+  console.error('[IMPORT]   1. Syntax error in routes.ts or its dependencies');
+  console.error('[IMPORT]   2. Top-level code execution in imported modules');
+  console.error('[IMPORT]   3. Missing dependencies (check package.json)');
+  console.error('[IMPORT]   4. Circular dependency between modules');
+  console.error('[IMPORT]   5. setInterval/setTimeout at module scope');
+  throw error;
+}
+
+try {
+  console.log('[IMPORT] 🔵 Importing ./server/api-utils...');
+  var apiUtilsModule = require("./server/api-utils");
+  console.log('[IMPORT] ✅ API utils imported successfully');
+} catch (error) {
+  console.error('[IMPORT] ❌ FATAL: Failed to import api-utils:', error);
+  console.error('[IMPORT] This is an IMPORT-TIME CRASH');
+  throw error;
+}
+
+console.log('[IMPORT] 🟢 All imports successful');
+
+// Create Express app
+console.log('[IMPORT] 🔵 Creating Express app...');
+const app = express.default();
+const httpServer = http.createServer(app);
+console.log('[IMPORT] ✅ Express app created');
 
 // Simple health check that doesn't require initialization
-app.get('/api/health', (_req, res) => {
+console.log('[IMPORT] 🔵 Registering health check endpoint...');
+app.get('/api/health', (_req: any, res: any) => {
+  console.log('[HANDLER] 🟢 Health check endpoint called');
   res.json({
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -21,6 +76,7 @@ app.get('/api/health', (_req, res) => {
     }
   });
 });
+console.log('[IMPORT] ✅ Health check registered');
 
 declare module "http" {
   interface IncomingMessage {
@@ -28,15 +84,17 @@ declare module "http" {
   }
 }
 
+console.log('[IMPORT] 🔵 Setting up middleware...');
 app.use(
   express.json({
-    verify: (req, _res, buf) => {
+    verify: (req: any, _res: any, buf: any) => {
       req.rawBody = buf;
     },
   }),
 );
 
 app.use(express.urlencoded({ extended: false }));
+console.log('[IMPORT] ✅ Middleware setup complete');
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -49,13 +107,13 @@ export function log(message: string, source = "express") {
   console.log(`${formattedTime} [${source}] ${message}`);
 }
 
-app.use((req, res, next) => {
+app.use((req: any, res: any, next: any) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
   const originalResJson = res.json;
-  res.json = function (bodyJson, ...args) {
+  res.json = function (bodyJson: any, ...args: any[]) {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
@@ -78,80 +136,117 @@ app.use((req, res, next) => {
 // Initialize routes
 let routesInitialized = false;
 async function initializeApp() {
+  console.log('[INIT] 🔵 initializeApp() called');
+
   if (!routesInitialized) {
     try {
-      console.log('[Vercel] Initializing serverless function...');
-      console.log('[Vercel] NODE_ENV:', process.env.NODE_ENV);
+      console.log('[INIT] 🟡 Starting serverless function initialization...');
+      console.log('[INIT] NODE_ENV:', process.env.NODE_ENV);
 
       // Validate environment variables
-      const envValidation = validateEnvVariables({
+      console.log('[INIT] 🔵 Validating environment variables...');
+      const envValidation = apiUtilsModule.validateEnvVariables({
         optional: ['OPENSTATES_API_KEY', 'LEGISCAN_API_KEY', 'DATABASE_URL'],
       });
 
       if (envValidation.warnings.length > 0) {
-        console.log('[Vercel] Environment warnings:');
-        envValidation.warnings.forEach(warning => console.log(`  - ${warning}`));
+        console.log('[INIT] Environment warnings:');
+        envValidation.warnings.forEach((warning: string) => console.log(`  - ${warning}`));
       }
 
-      console.log('[Vercel] OPENSTATES_API_KEY set:', !!process.env.OPENSTATES_API_KEY);
-      console.log('[Vercel] LEGISCAN_API_KEY set:', !!process.env.LEGISCAN_API_KEY);
+      console.log('[INIT] OPENSTATES_API_KEY set:', !!process.env.OPENSTATES_API_KEY);
+      console.log('[INIT] LEGISCAN_API_KEY set:', !!process.env.LEGISCAN_API_KEY);
 
       // Skip database seeding in production - too slow for serverless
-      // Database should be seeded separately
-      console.log('[Vercel] Skipping database seed (use separate script for production)');
+      console.log('[INIT] Skipping database seed (use separate script for production)');
 
-      console.log('[Vercel] Registering routes...');
-      await registerRoutes(httpServer, app);
-      console.log('[Vercel] Routes registered successfully');
+      console.log('[INIT] 🔵 Registering routes...');
+      await routesModule.registerRoutes(httpServer, app);
+      console.log('[INIT] ✅ Routes registered successfully');
 
-      app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+      app.use((err: any, _req: any, res: any, _next: any) => {
         const status = err.status || err.statusCode || 500;
         const message = err.message || "Internal Server Error";
-        console.error('[Vercel] Route error:', status, message, err);
+        console.error('[INIT] Route error:', status, message, err);
         res.status(status).json({ message });
       });
 
       routesInitialized = true;
-      console.log('[Vercel] ✅ Serverless function initialized successfully');
+      console.log('[INIT] 🟢 Serverless function initialized successfully');
     } catch (error) {
-      console.error('[Vercel] ❌ FATAL: Initialization failed:', error);
-      console.error('[Vercel] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('[INIT] ❌ FATAL: Initialization failed:', error);
+      console.error('[INIT] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       throw error;
     }
+  } else {
+    console.log('[INIT] ⚪ Routes already initialized (cached)');
   }
+
   return app;
 }
 
-// Vercel serverless function handler
+// ============================================================================
+// REQUEST HANDLER (executes for each incoming request)
+// ============================================================================
 export default async function handler(req: any, res: any) {
-  console.log('[Vercel] Incoming request:', req.method, req.url);
+  console.log('[HANDLER] 🟡 ==================== NEW REQUEST ====================');
+  console.log('[HANDLER] Timestamp:', new Date().toISOString());
+  console.log('[HANDLER] Method:', req.method);
+  console.log('[HANDLER] URL:', req.url);
+  console.log('[HANDLER] Headers:', JSON.stringify(req.headers, null, 2));
 
   try {
+    console.log('[HANDLER] 🔵 Calling initializeApp()...');
     const app = await initializeApp();
-    console.log('[Vercel] App initialized, processing request...');
-    return app(req, res);
+    console.log('[HANDLER] ✅ App initialized successfully');
+
+    console.log('[HANDLER] 🔵 Passing request to Express app...');
+    const result = app(req, res);
+
+    // Log when response is about to be sent
+    res.on('finish', () => {
+      console.log('[HANDLER] 🟢 Response sent successfully');
+      console.log('[HANDLER] Status:', res.statusCode);
+      console.log('[HANDLER] ==================== END REQUEST ====================');
+    });
+
+    return result;
   } catch (error) {
-    console.error('[Vercel] ❌ Handler error:', error);
-    console.error('[Vercel] Error details:', {
+    console.error('[HANDLER] ❌ ==================== REQUEST FAILED ====================');
+    console.error('[HANDLER] Handler crashed during request processing');
+    console.error('[HANDLER] Error:', error);
+    console.error('[HANDLER] Error details:', {
       message: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : 'No stack trace',
       env: {
         NODE_ENV: process.env.NODE_ENV,
+        hasOpenStatesKey: !!process.env.OPENSTATES_API_KEY,
         hasLegiscanKey: !!process.env.LEGISCAN_API_KEY,
         hasDatabaseUrl: !!process.env.DATABASE_URL
       }
     });
 
-    // Send detailed error response as JSON (not HTML)
+    // ALWAYS return valid JSON, even if an exception occurs
     if (!res.headersSent) {
+      console.log('[HANDLER] 🔵 Sending error response...');
       res.setHeader('Content-Type', 'application/json');
       res.statusCode = 500;
-      return res.end(JSON.stringify({
+      const errorResponse = JSON.stringify({
         error: 'Serverless Function Failed',
         message: error instanceof Error ? error.message : 'Unknown error occurred',
         timestamp: new Date().toISOString(),
-        hint: 'Check Vercel function logs for details'
-      }));
+        hint: 'Check Vercel function logs for details',
+        crashedDuring: 'request-handling'
+      });
+      console.log('[HANDLER] Error response:', errorResponse);
+      console.log('[HANDLER] 🔴 ==================== END REQUEST (ERROR) ====================');
+      return res.end(errorResponse);
+    } else {
+      console.error('[HANDLER] Headers already sent, cannot send error response');
+      console.log('[HANDLER] 🔴 ==================== END REQUEST (ERROR) ====================');
     }
   }
 }
+
+console.log('[IMPORT] 🟢 ==================== MODULE IMPORT COMPLETE ====================');
+console.log('[IMPORT] Module loaded successfully, ready to handle requests');
