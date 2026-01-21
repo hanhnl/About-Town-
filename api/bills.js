@@ -91,19 +91,22 @@ function inferTopic(subjects, title) {
 async function fetchFromOpenStates(limit) {
   const apiKey = process.env.OPENSTATES_API_KEY;
 
+  console.log('[BILLS] Starting fetch, API key exists:', !!apiKey);
+
   if (!apiKey) {
-    console.log('⚠️ OPENSTATES_API_KEY not set - using sample data');
+    console.log('[BILLS] ⚠️ OPENSTATES_API_KEY not set - using sample data');
     return null;
   }
 
   try {
-    console.log('🔄 Fetching bills from OpenStates API...');
+    console.log('[BILLS] 🔄 Fetching bills from OpenStates API...');
 
     const url = new URL('https://v3.openstates.org/bills');
     url.searchParams.set('jurisdiction', 'Maryland');
     url.searchParams.set('per_page', String(Math.min(limit, 100)));
 
-    console.log('🔄 URL:', url.toString());
+    console.log('[BILLS] 🔄 Request URL:', url.toString());
+    console.log('[BILLS] 🔄 API key length:', apiKey.length);
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -112,18 +115,21 @@ async function fetchFromOpenStates(limit) {
       },
     });
 
-    console.log('✅ Response status:', response.status);
+    console.log('[BILLS] ✅ Response status:', response.status);
+    console.log('[BILLS] Response ok:', response.ok);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`❌ OpenStates API returned ${response.status}: ${errorText}`);
+      console.error(`[BILLS] ❌ OpenStates API returned ${response.status}: ${errorText}`);
       return null;
     }
 
     const data = await response.json();
+    console.log('[BILLS] Data received, has results:', !!data.results);
+    console.log('[BILLS] Results count:', data.results?.length || 0);
 
     if (!data.results || data.results.length === 0) {
-      console.log('⚠️ OpenStates returned no bills');
+      console.log('[BILLS] ⚠️ OpenStates returned no bills');
       return null;
     }
 
@@ -142,41 +148,56 @@ async function fetchFromOpenStates(limit) {
       lastAction: bill.latest_action_description,
     }));
 
-    console.log(`✅ Fetched ${bills.length} real bills from OpenStates`);
+    console.log(`[BILLS] ✅ Fetched ${bills.length} real bills from OpenStates`);
+    console.log('[BILLS] First bill:', bills[0]?.billNumber, '-', bills[0]?.title);
     return bills;
   } catch (error) {
-    console.error('❌ OpenStates API error:', error.message);
+    console.error('[BILLS] ❌ OpenStates API error:', error.message);
+    console.error('[BILLS] Error type:', error.name);
+    console.error('[BILLS] Error stack:', error.stack);
     return null;
   }
 }
 
 module.exports = async (req, res) => {
+  console.log('[BILLS HANDLER] Request received');
+  console.log('[BILLS HANDLER] Query params:', req.query);
+
   try {
     const limit = parseInt(req.query.limit) || 50;
     const debug = req.query.debug === 'true';
 
+    console.log('[BILLS HANDLER] Limit:', limit, 'Debug:', debug);
+    console.log('[BILLS HANDLER] Calling fetchFromOpenStates...');
+
     // Try OpenStates API first
     const liveData = await fetchFromOpenStates(limit);
 
+    console.log('[BILLS HANDLER] fetchFromOpenStates returned:', liveData ? `${liveData.length} bills` : 'null');
+
     if (liveData && liveData.length > 0) {
+      console.log('[BILLS HANDLER] ✅ Returning live data');
       return res.status(200).json(liveData.slice(0, limit));
     }
 
     // Fallback to sample data with debug info
-    console.log('📊 Returning sample bills (OpenStates unavailable)');
+    console.log('[BILLS HANDLER] 📊 Returning sample bills (OpenStates unavailable)');
+    console.log('[BILLS HANDLER] Reason: liveData was', liveData === null ? 'null' : 'empty array');
 
     if (debug) {
       return res.status(200).json({
         debug: true,
         message: 'OpenStates API failed - check server logs',
         hasApiKey: !!process.env.OPENSTATES_API_KEY,
+        apiKeyLength: process.env.OPENSTATES_API_KEY?.length || 0,
         sampleData: SAMPLE_BILLS
       });
     }
 
     res.status(200).json(SAMPLE_BILLS);
   } catch (error) {
-    console.error('❌ Bills API error:', error.message);
+    console.error('[BILLS HANDLER] ❌ Bills API error:', error.message);
+    console.error('[BILLS HANDLER] Error stack:', error.stack);
     res.status(200).json(SAMPLE_BILLS);
   }
 };
