@@ -49,22 +49,32 @@ export default function Dashboard() {
     retry: 2,
   });
 
+  // Debug: Log what we received from API
+  console.log('[Dashboard] API response - bills:', bills);
+  console.log('[Dashboard] Bills count:', (bills || []).length);
+  console.log('[Dashboard] Bills type:', typeof bills, Array.isArray(bills));
+
   const filteredBills = useMemo(() => {
-    return (bills || [])
-      .map(mapBillToCardFormat)
-      .filter((bill) => {
-        if (statusFilter !== "all" && bill.status !== statusFilter) return false;
-        if (topicFilter !== "all" && bill.topic !== topicFilter) return false;
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          return (
-            bill.title.toLowerCase().includes(query) ||
-            bill.summary.toLowerCase().includes(query) ||
-            bill.billNumber.toLowerCase().includes(query)
-          );
-        }
-        return true;
-      });
+    const mappedBills = (bills || []).map(mapBillToCardFormat);
+    console.log('[Dashboard] After mapping:', mappedBills.length, 'bills');
+
+    const filtered = mappedBills.filter((bill) => {
+      if (statusFilter !== "all" && bill.status !== statusFilter) return false;
+      if (topicFilter !== "all" && bill.topic !== topicFilter) return false;
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        return (
+          bill.title.toLowerCase().includes(query) ||
+          bill.summary.toLowerCase().includes(query) ||
+          bill.billNumber.toLowerCase().includes(query)
+        );
+      }
+      return true;
+    });
+
+    console.log('[Dashboard] After filtering:', filtered.length, 'bills');
+    console.log('[Dashboard] Filters - status:', statusFilter, 'topic:', topicFilter, 'search:', searchQuery);
+    return filtered;
   }, [bills, statusFilter, topicFilter, searchQuery]);
 
   const stats = useMemo(() => {
