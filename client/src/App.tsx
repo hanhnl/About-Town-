@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Header } from "@/components/Header";
 import NotFound from "@/pages/not-found";
 import Landing from "@/pages/Landing";
@@ -36,29 +37,31 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <LocationProvider>
-          <AuthProvider>
-            <TooltipProvider>
-              <div className="min-h-screen bg-background">
-                <a 
-                  href="#main-content" 
-                  className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md"
-                >
-                  Skip to main content
-                </a>
-                <Header />
-                <main id="main-content" role="main">
-                  <Router />
-                </main>
-              </div>
-              <Toaster />
-            </TooltipProvider>
-          </AuthProvider>
-        </LocationProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <LocationProvider>
+            <AuthProvider>
+              <TooltipProvider>
+                <div className="min-h-screen bg-background">
+                  <a
+                    href="#main-content"
+                    className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-md"
+                  >
+                    Skip to main content
+                  </a>
+                  <Header />
+                  <main id="main-content" role="main">
+                    <Router />
+                  </main>
+                </div>
+                <Toaster />
+              </TooltipProvider>
+            </AuthProvider>
+          </LocationProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
-    "vercel-build": "vite build",
     "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "test:setup": "node test-setup.js",
@@ -99,6 +98,7 @@
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
+    "@vercel/node": "^5.5.25",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
