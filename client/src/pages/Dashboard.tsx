@@ -109,8 +109,8 @@ export default function Dashboard() {
             )}
           </div>
           <p className="text-lg text-muted-foreground">
-            {bills.length > 0
-              ? `Tracking ${bills.length} bills from the Maryland General Assembly`
+            {(bills || []).length > 0
+              ? `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
               : "Loading bills from Maryland legislature..."
             }
           </p>
@@ -154,7 +154,7 @@ export default function Dashboard() {
         )}
 
         <div className="mt-8 text-center text-sm text-muted-foreground">
-          Showing {filteredBills.length} of {bills.length} bills
+          Showing {filteredBills.length} of {(bills || []).length} bills
         </div>
       </div>
     </div>
