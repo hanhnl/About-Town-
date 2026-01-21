@@ -32,14 +32,17 @@ export class RateLimiter {
       }),
     };
 
-    // Cleanup expired entries every minute
-    setInterval(() => this.cleanup(), 60000);
+    // Note: Removed setInterval for serverless compatibility
+    // Cleanup happens on-demand in middleware instead
   }
 
   middleware() {
     return (req: Request, res: Response, next: NextFunction) => {
       const key = this.options.keyGenerator(req);
       const now = Date.now();
+
+      // Cleanup expired entries on-demand (serverless-safe)
+      this.cleanup();
 
       // Initialize or get current bucket
       if (!this.store[key] || this.store[key].resetTime < now) {
