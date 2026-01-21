@@ -1,15 +1,11 @@
-import express from "express";
-import { createServer } from "http";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { registerRoutes } from "./server/routes";
 
-// Create Express app
-const app = express();
-const httpServer = createServer(app);
-
-// Setup middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+// Lazy-load dependencies to avoid module-level import errors
+let express: any = null;
+let createServer: any = null;
+let registerRoutes: any = null;
+let app: any = null;
+let httpServer: any = null;
 
 // Register all routes
 let routesInitialized = false;
@@ -22,7 +18,31 @@ async function initializeRoutes() {
 
   if (!routesInitialized) {
     try {
-      console.log('[API] Initializing routes...');
+      console.log('[API] Loading dependencies...');
+
+      // Lazy load express and http
+      if (!express) {
+        express = (await import("express")).default;
+        createServer = (await import("http")).createServer;
+      }
+
+      // Create Express app if not created
+      if (!app) {
+        console.log('[API] Creating Express app...');
+        app = express();
+        httpServer = createServer(app);
+        app.use(express.json());
+        app.use(express.urlencoded({ extended: false }));
+      }
+
+      // Lazy load and register routes
+      if (!registerRoutes) {
+        console.log('[API] Loading routes module...');
+        const routesModule = await import("./server/routes.js");
+        registerRoutes = routesModule.registerRoutes;
+      }
+
+      console.log('[API] Registering routes...');
       await registerRoutes(httpServer, app);
       routesInitialized = true;
       console.log('[API] Routes initialized successfully');
