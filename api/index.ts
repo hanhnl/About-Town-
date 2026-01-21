@@ -3,6 +3,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { createServer } from "http";
 import { registerRoutes } from "./server/routes";
+import { validateEnvVariables } from "./server/api-utils";
 
 const app = express();
 const httpServer = createServer(app);
@@ -14,6 +15,7 @@ app.get('/api/health', (_req, res) => {
     timestamp: new Date().toISOString(),
     env: {
       nodeEnv: process.env.NODE_ENV,
+      hasOpenStatesKey: !!process.env.OPENSTATES_API_KEY,
       hasLegiScanKey: !!process.env.LEGISCAN_API_KEY,
       hasDatabaseUrl: !!process.env.DATABASE_URL
     }
@@ -80,6 +82,18 @@ async function initializeApp() {
     try {
       console.log('[Vercel] Initializing serverless function...');
       console.log('[Vercel] NODE_ENV:', process.env.NODE_ENV);
+
+      // Validate environment variables
+      const envValidation = validateEnvVariables({
+        optional: ['OPENSTATES_API_KEY', 'LEGISCAN_API_KEY', 'DATABASE_URL'],
+      });
+
+      if (envValidation.warnings.length > 0) {
+        console.log('[Vercel] Environment warnings:');
+        envValidation.warnings.forEach(warning => console.log(`  - ${warning}`));
+      }
+
+      console.log('[Vercel] OPENSTATES_API_KEY set:', !!process.env.OPENSTATES_API_KEY);
       console.log('[Vercel] LEGISCAN_API_KEY set:', !!process.env.LEGISCAN_API_KEY);
 
       // Skip database seeding in production - too slow for serverless
