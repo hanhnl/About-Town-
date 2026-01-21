@@ -15,16 +15,35 @@ app.use(express.urlencoded({ extended: false }));
 let routesInitialized = false;
 async function initializeRoutes() {
   if (!routesInitialized) {
-    await registerRoutes(httpServer, app);
-    routesInitialized = true;
+    try {
+      console.log('[API] Initializing routes...');
+      await registerRoutes(httpServer, app);
+      routesInitialized = true;
+      console.log('[API] Routes initialized successfully');
+    } catch (error) {
+      console.error('[API] Failed to initialize routes:', error);
+      console.error('[API] Route init error stack:', error instanceof Error ? error.stack : 'No stack');
+      throw error;
+    }
   }
 }
 
 // Vercel serverless function handler
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Initialize routes once
-  await initializeRoutes();
+  try {
+    // Initialize routes once
+    await initializeRoutes();
 
-  // Pass request to Express app
-  return app(req as any, res as any);
+    // Pass request to Express app
+    return app(req as any, res as any);
+  } catch (error) {
+    console.error('[API] Handler error:', error);
+    console.error('[API] Error stack:', error instanceof Error ? error.stack : 'No stack');
+
+    return res.status(500).json({
+      error: 'Internal Server Error',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      hint: 'Check Vercel function logs for details'
+    });
+  }
 }
