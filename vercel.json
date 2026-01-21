@@ -4,6 +4,10 @@
   "installCommand": "npm install",
   "rewrites": [
     {
+      "source": "/api/zipcodes/lookup/:zipcode",
+      "destination": "/api/zipcode-lookup?zipcode=:zipcode"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

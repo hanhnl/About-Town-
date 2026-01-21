@@ -3,7 +3,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
-    const zipcode = req.query.zipcode as string;
+    // Handle both /api/zipcode-lookup?zipcode=20901 and /api/zipcodes/lookup/20901
+    const zipcode = (req.query.zipcode || req.url?.split('/').pop()) as string;
 
     // Validate zipcode format
     if (!zipcode || !/^\d{5}$/.test(zipcode)) {
