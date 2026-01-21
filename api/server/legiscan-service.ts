@@ -155,13 +155,13 @@ async function makeLegiScanRequest<T>(operation: string, params: Record<string, 
       throw new Error(`LegiScan API responded with status ${response.status}`);
     }
     
-    const data = await response.json();
-    
+    const data = await response.json() as any;
+
     if (data.status === 'ERROR') {
       throw new Error(`LegiScan API error: ${data.alert?.message || 'Unknown error'}`);
     }
-    
-    return data;
+
+    return data as T;
   } catch (error) {
     clearTimeout(timeoutId);
     throw error;
