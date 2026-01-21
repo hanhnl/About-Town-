@@ -169,7 +169,7 @@ async function makeOpenStatesRequest<T>(
         throw new Error(`OpenStates API responded with status ${response.status}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as T;
       return data;
     } catch (error) {
       clearTimeout(timeoutId);

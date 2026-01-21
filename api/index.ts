@@ -9,56 +9,29 @@ console.log('[IMPORT] Environment:', process.env.NODE_ENV || 'unknown');
 // Note: Vercel automatically injects environment variables
 // dotenv is only needed for local development
 
-try {
-  console.log('[IMPORT] 🔵 Importing express...');
-  var express = require("express");
-  console.log('[IMPORT] ✅ Express imported successfully');
-} catch (error) {
-  console.error('[IMPORT] ❌ FATAL: Failed to import express:', error);
-  throw error;
-}
+// ES Module imports (compatible with Vercel serverless)
+console.log('[IMPORT] 🔵 Importing express...');
+import express from "express";
+console.log('[IMPORT] ✅ Express imported successfully');
 
-try {
-  console.log('[IMPORT] 🔵 Importing http...');
-  var http = require("http");
-  console.log('[IMPORT] ✅ HTTP imported successfully');
-} catch (error) {
-  console.error('[IMPORT] ❌ FATAL: Failed to import http:', error);
-  throw error;
-}
+console.log('[IMPORT] 🔵 Importing http...');
+import { createServer } from "http";
+console.log('[IMPORT] ✅ HTTP imported successfully');
 
-try {
-  console.log('[IMPORT] 🔵 Importing ./server/routes...');
-  var routesModule = require("./server/routes");
-  console.log('[IMPORT] ✅ Routes imported successfully');
-} catch (error) {
-  console.error('[IMPORT] ❌ FATAL: Failed to import routes:', error);
-  console.error('[IMPORT] This is an IMPORT-TIME CRASH');
-  console.error('[IMPORT] Possible causes:');
-  console.error('[IMPORT]   1. Syntax error in routes.ts or its dependencies');
-  console.error('[IMPORT]   2. Top-level code execution in imported modules');
-  console.error('[IMPORT]   3. Missing dependencies (check package.json)');
-  console.error('[IMPORT]   4. Circular dependency between modules');
-  console.error('[IMPORT]   5. setInterval/setTimeout at module scope');
-  throw error;
-}
+console.log('[IMPORT] 🔵 Importing ./server/routes...');
+import * as routesModule from "./server/routes";
+console.log('[IMPORT] ✅ Routes imported successfully');
 
-try {
-  console.log('[IMPORT] 🔵 Importing ./server/api-utils...');
-  var apiUtilsModule = require("./server/api-utils");
-  console.log('[IMPORT] ✅ API utils imported successfully');
-} catch (error) {
-  console.error('[IMPORT] ❌ FATAL: Failed to import api-utils:', error);
-  console.error('[IMPORT] This is an IMPORT-TIME CRASH');
-  throw error;
-}
+console.log('[IMPORT] 🔵 Importing ./server/api-utils...');
+import * as apiUtilsModule from "./server/api-utils";
+console.log('[IMPORT] ✅ API utils imported successfully');
 
 console.log('[IMPORT] 🟢 All imports successful');
 
 // Create Express app
 console.log('[IMPORT] 🔵 Creating Express app...');
-const app = express.default();
-const httpServer = http.createServer(app);
+const app = express();
+const httpServer = createServer(app);
 console.log('[IMPORT] ✅ Express app created');
 
 // Simple health check that doesn't require initialization

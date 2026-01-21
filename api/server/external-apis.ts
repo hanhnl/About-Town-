@@ -220,7 +220,7 @@ export async function fetchRealBills(options: {
       throw new Error(`API responded with status ${response.status}`);
     }
     
-    const data: MCBillAPIResponse[] = await response.json();
+    const data = await response.json() as MCBillAPIResponse[];
     
     const bills = data.map(bill => ({
       billNumber: bill.bill_no,
