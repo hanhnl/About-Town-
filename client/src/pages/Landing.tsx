@@ -129,7 +129,7 @@ export default function Landing() {
   };
 
   // Convert bills to RealBill format for display
-  const displayBills: RealBill[] = allBills.slice(0, 5).map(bill => ({
+  const displayBills: RealBill[] = (allBills || []).slice(0, 5).map(bill => ({
     billNumber: bill.billNumber,
     title: bill.title,
     status: bill.status,
