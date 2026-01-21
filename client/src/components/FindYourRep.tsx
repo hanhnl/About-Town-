@@ -75,7 +75,7 @@ export function FindYourRep() {
 
         {showReps && !isLoading && (
           <div className="space-y-4">
-            {representatives.map((rep) => (
+            {(representatives || []).map((rep) => (
               <div 
                 key={rep.id} 
                 className="border rounded-lg overflow-hidden"

@@ -50,7 +50,7 @@ export default function Dashboard() {
   });
 
   const filteredBills = useMemo(() => {
-    return bills
+    return (bills || [])
       .map(mapBillToCardFormat)
       .filter((bill) => {
         if (statusFilter !== "all" && bill.status !== statusFilter) return false;
@@ -68,9 +68,10 @@ export default function Dashboard() {
   }, [bills, statusFilter, topicFilter, searchQuery]);
 
   const stats = useMemo(() => {
-    const total = bills.length;
-    const active = bills.filter((b) => ["active", "in_committee", "introduced", "public_hearing"].includes(b.status)).length;
-    const passed = bills.filter((b) => ["approved", "enacted", "passed"].includes(b.status)).length;
+    const safeBills = bills || [];
+    const total = safeBills.length;
+    const active = safeBills.filter((b) => ["active", "in_committee", "introduced", "public_hearing"].includes(b.status)).length;
+    const passed = safeBills.filter((b) => ["approved", "enacted", "passed"].includes(b.status)).length;
     return { total, active, passed };
   }, [bills]);
 

@@ -121,7 +121,7 @@ export default function BillDetail() {
     enabled: !!bill,
   });
 
-  const comments: Comment[] = backendComments.map(c => ({
+  const comments: Comment[] = (backendComments || []).map(c => ({
     id: String(c.id),
     author: c.author,
     authorInitials: c.authorInitials,
@@ -131,7 +131,7 @@ export default function BillDetail() {
     upvotes: c.upvotes || 0,
   }));
 
-  const timelineEvents: TimelineEvent[] = timeline.map((t, index) => ({
+  const timelineEvents: TimelineEvent[] = (timeline || []).map((t, index) => ({
     id: String(t.id || index),
     date: t.date,
     title: t.title,
@@ -140,7 +140,7 @@ export default function BillDetail() {
     type: (t.type as TimelineEvent["type"]) || "committee",
   }));
 
-  const councilVotesFormatted: CouncilMemberVote[] = councilVotes.map((v) => ({
+  const councilVotesFormatted: CouncilMemberVote[] = (councilVotes || []).map((v) => ({
     id: String(v.id),
     name: v.councilMember?.name || "Unknown",
     initials: v.councilMember?.initials || "??",
