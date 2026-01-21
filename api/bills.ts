@@ -96,9 +96,20 @@ async function fetchFromOpenStates(limit: number) {
 
     if (!response.ok) return null;
 
-    const data = await response.json();
+    const data = await response.json() as {
+      results?: Array<{
+        id: string;
+        identifier: string;
+        title: string;
+        abstracts?: Array<{ abstract: string }>;
+        latest_action_description?: string;
+        subject?: string[];
+        latest_action_date?: string;
+        openstates_url?: string;
+      }>;
+    };
 
-    return data.results?.map((bill: any) => ({
+    return data.results?.map((bill) => ({
       id: bill.id,
       billNumber: bill.identifier,
       title: bill.title,
