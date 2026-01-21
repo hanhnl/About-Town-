@@ -38,7 +38,7 @@ async function initializeRoutes() {
       // Lazy load and register routes
       if (!registerRoutes) {
         console.log('[API] Loading routes module...');
-        const routesModule = await import("./server/routes.js");
+        const routesModule = await import("./server/routes");
         registerRoutes = routesModule.registerRoutes;
       }
 
