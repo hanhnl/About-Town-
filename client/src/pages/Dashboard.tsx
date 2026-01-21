@@ -86,7 +86,7 @@ export default function Dashboard() {
     );
   }
 
-  const hasLiveData = bills.some((bill: any) => bill.isLiveData);
+  const hasLiveData = (bills || []).some((bill: any) => bill.isLiveData);
 
   return (
     <div className="min-h-screen bg-background">
