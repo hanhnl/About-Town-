@@ -1,6 +1,8 @@
 // Standalone bills API - no Express, no shared imports
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
+console.log('[BILLS] Module loaded');
+
 // Sample bills data (no external dependencies)
 const SAMPLE_BILLS = [
   {
@@ -138,28 +140,29 @@ function inferTopic(subjects: string[], title: string): string {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  console.log('[BILLS] Handler invoked');
+
   try {
     const limit = parseInt(req.query.limit as string) || 50;
+    console.log(`[BILLS] Fetching ${limit} bills`);
 
     // Try OpenStates API first
     const liveData = await fetchFromOpenStates(limit);
 
     if (liveData && liveData.length > 0) {
-      console.log(`✅ Returning ${liveData.length} bills from OpenStates`);
+      console.log(`[BILLS] ✅ Returning ${liveData.length} bills from OpenStates`);
       return res.status(200).json(liveData.slice(0, limit));
     }
 
     // Fallback to sample data
-    console.log(`📊 Returning ${SAMPLE_BILLS.length} sample bills`);
+    console.log(`[BILLS] 📊 Returning ${SAMPLE_BILLS.length} sample bills`);
     return res.status(200).json(SAMPLE_BILLS);
   } catch (error) {
-    console.error('Bills API error:', error);
+    console.error('[BILLS] ❌ Error:', error);
 
     // Always return JSON, even on error
-    return res.status(500).json({
-      error: 'Failed to fetch bills',
-      message: error instanceof Error ? error.message : 'Unknown error',
-      fallback: SAMPLE_BILLS
-    });
+    return res.status(200).json(SAMPLE_BILLS);
+  } finally {
+    console.log('[BILLS] Handler complete');
   }
 }
