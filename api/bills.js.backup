@@ -1,4 +1,4 @@
-// Bills API - Simplified inline version
+// Bills API - Inline version for testing
 const SAMPLE_BILLS = [
   {
     id: 1,
@@ -53,21 +53,21 @@ module.exports = async (req, res) => {
   const apiKey = process.env.OPENSTATES_API_KEY;
   const limit = parseInt(req.query.limit) || 20;
 
-  console.log('[BILLS] Request received, limit:', limit);
-  console.log('[BILLS] API key exists:', !!apiKey);
+  console.log('[INLINE] Starting, API key exists:', !!apiKey);
 
-  // If no API key, return sample data immediately
   if (!apiKey) {
-    console.log('[BILLS] No API key - returning sample data');
+    console.log('[INLINE] No API key, returning sample data');
     return res.status(200).json(SAMPLE_BILLS);
   }
 
   try {
+    console.log('[INLINE] Fetching from OpenStates...');
+
     const url = new URL('https://v3.openstates.org/bills');
     url.searchParams.set('jurisdiction', 'Maryland');
     url.searchParams.set('per_page', String(limit));
 
-    console.log('[BILLS] Fetching:', url.toString());
+    console.log('[INLINE] URL:', url.toString());
 
     const response = await fetch(url.toString(), {
       headers: {
@@ -76,19 +76,19 @@ module.exports = async (req, res) => {
       },
     });
 
-    console.log('[BILLS] Response status:', response.status);
+    console.log('[INLINE] Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[BILLS] API error:', response.status, errorText);
+      console.error(`[INLINE] API error ${response.status}:`, errorText);
       return res.status(200).json(SAMPLE_BILLS);
     }
 
     const data = await response.json();
-    console.log('[BILLS] Results:', data.results?.length || 0);
+    console.log('[INLINE] Received data, results count:', data.results?.length || 0);
 
     if (!data.results || data.results.length === 0) {
-      console.log('[BILLS] No results - returning sample data');
+      console.log('[INLINE] No results, returning sample data');
       return res.status(200).json(SAMPLE_BILLS);
     }
 
@@ -107,13 +107,12 @@ module.exports = async (req, res) => {
       lastAction: bill.latest_action_description,
     }));
 
-    console.log('[BILLS] Returning', bills.length, 'live bills');
-    console.log('[BILLS] First bill:', bills[0]?.billNumber);
-
+    console.log('[INLINE] Returning', bills.length, 'live bills');
     return res.status(200).json(bills);
 
   } catch (error) {
-    console.error('[BILLS] Exception:', error.message);
+    console.error('[INLINE] Exception:', error.message);
+    console.error('[INLINE] Stack:', error.stack);
     return res.status(200).json(SAMPLE_BILLS);
   }
 };
