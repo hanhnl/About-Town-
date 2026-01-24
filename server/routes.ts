@@ -4,8 +4,7 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "@shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail as getLegiScanBillDetail, searchBills as searchLegiScanBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
-import { getMarylandBills as getOpenStatesBills, getBillDetail as getOpenStatesBillDetail, searchBills as searchOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "../api/server/openstates-service";
+import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format
@@ -40,58 +39,33 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Diagnostic endpoint - visit this to check if OpenStates/LegiScan is working
+  // Diagnostic endpoint - visit this to check if LegiScan is working
   app.get("/api/debug/status", async (_req, res) => {
     try {
       const status = {
         databaseConfigured: isDatabaseConfigured(),
-        openStatesConfigured: isOpenStatesConfigured(),
         legiScanConfigured: isLegiScanConfigured(),
         environment: process.env.NODE_ENV || 'unknown',
         timestamp: new Date().toISOString(),
       };
 
-      // Try OpenStates first
-      let openStatesTest = { working: false, error: null as any, billCount: 0 };
-      if (isOpenStatesConfigured()) {
-        try {
-          const bills = await getOpenStatesBills({ limit: 5 });
-          openStatesTest = { working: true, error: null, billCount: bills.length };
-        } catch (error) {
-          openStatesTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
-        }
-      }
-
-      // Try LegiScan as fallback
+      // Try to fetch a bill from LegiScan to test the connection
       let legiScanTest = { working: false, error: null as any, billCount: 0 };
       if (isLegiScanConfigured()) {
         try {
-          const bills = await getLegiScanBills({ limit: 5 });
+          const bills = await getMarylandBills({ limit: 5 });
           legiScanTest = { working: true, error: null, billCount: bills.length };
         } catch (error) {
           legiScanTest = { working: false, error: error instanceof Error ? error.message : String(error), billCount: 0 };
         }
       }
 
-      // Determine primary message
-      let message = '';
-      if (openStatesTest.working) {
-        message = '✅ OpenStates API is working!';
-      } else if (legiScanTest.working) {
-        message = '✅ LegiScan API is working!';
-      } else if (isOpenStatesConfigured()) {
-        message = '❌ OpenStates API key set but requests failing';
-      } else if (isLegiScanConfigured()) {
-        message = '❌ LegiScan API key set but requests failing';
-      } else {
-        message = '⚠️  No API keys configured - using sample data';
-      }
-
       res.json({
         ...status,
-        openStates: openStatesTest,
         legiScan: legiScanTest,
-        message
+        message: isLegiScanConfigured()
+          ? (legiScanTest.working ? '✅ LegiScan API is working!' : '❌ LegiScan API key set but requests failing')
+          : '⚠️  LegiScan API key not set in environment variables'
       });
     } catch (error) {
       console.error('Debug endpoint error:', error);
@@ -114,73 +88,15 @@ export async function registerRoutes(
 
     try {
 
-      // PRIORITY 1: Try OpenStates API first
-      if (isOpenStatesConfigured()) {
-        try {
-          console.log('🔄 Fetching bills from OpenStates API...');
-          const openStatesBills = await getOpenStatesBills({ limit: limit * (page || 1), search });
-
-          if (openStatesBills.length > 0) {
-            // Convert OpenStates format to frontend format
-            let bills = openStatesBills.map((bill) => ({
-              id: bill.billId,
-              billNumber: bill.billNumber,
-              title: bill.title,
-              summary: bill.description,
-              status: bill.status,
-              topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
-              voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
-              supportVotes: Math.floor(Math.random() * 80) + 10, // TODO: Get real votes
-              opposeVotes: Math.floor(Math.random() * 30) + 5,
-              sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
-              isLiveData: true,
-              lastAction: bill.lastAction,
-            }));
-
-            // Apply filters
-            if (status && status !== 'all') {
-              bills = bills.filter(bill => bill.status === status);
-            }
-            if (topic && topic !== 'all') {
-              bills = bills.filter(bill => bill.topic === topic);
-            }
-
-            // Apply pagination if requested
-            if (usePagination) {
-              const startIndex = (page - 1) * limit;
-              const endIndex = startIndex + limit;
-              const paginatedBills = bills.slice(startIndex, endIndex);
-
-              console.log(`✅ Returning ${paginatedBills.length} bills from OpenStates API (page ${page})`);
-              return res.json({
-                bills: paginatedBills,
-                total: bills.length,
-                page,
-                limit,
-                totalPages: Math.ceil(bills.length / limit)
-              });
-            } else {
-              // Return all bills (up to limit) for backwards compatibility
-              console.log(`✅ Returning ${bills.length} bills from OpenStates API`);
-              return res.json(bills.slice(0, limit));
-            }
-          }
-        } catch (openStatesError) {
-          console.warn('⚠️  OpenStates API failed, trying LegiScan fallback:', openStatesError);
-        }
-      } else {
-        console.log('ℹ️  OpenStates API key not configured, trying LegiScan...');
-      }
-
-      // PRIORITY 2: Try LegiScan API as fallback
+      // Try LegiScan API first
       if (isLegiScanConfigured()) {
         try {
           console.log('🔄 Fetching bills from LegiScan API...');
-          const legiScanBills = await getLegiScanBills({ limit: limit * (page || 1), search });
+          const legiScanBills = await getMarylandBills({ limit: limit * page, search });
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
-            let bills = legiScanBills.map((bill) => ({
+            let bills = legiScanBills.map((bill, index) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
               title: bill.title,
@@ -224,14 +140,13 @@ export async function registerRoutes(
             }
           }
         } catch (legiScanError) {
-          console.warn('⚠️  LegiScan API also failed, falling back to sample data:', legiScanError);
+          console.warn('⚠️  LegiScan API failed, falling back to sample data:', legiScanError);
         }
       } else {
-        console.log('ℹ️  LegiScan API key not configured either, using sample data');
+        console.log('ℹ️  LegiScan API key not configured, using sample data');
       }
 
-      // PRIORITY 3: Fallback to hardcoded sample bills
-      console.log('ℹ️  Using sample bills (no API keys configured)');
+      // Fallback to hardcoded sample bills
       const sampleBills = [
         {
           id: 1,
