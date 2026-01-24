@@ -42,8 +42,9 @@ export function BillCard({ bill }: BillCardProps) {
       className="hover-elevate h-full"
       data-testid={`card-bill-${bill.id}`}
     >
-      <CardContent className="p-6">
-        <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
+      <CardContent className="p-4 sm:p-6">
+        {/* Mobile: Stack vertically, Desktop: Horizontal */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-mono text-muted-foreground" data-testid={`text-bill-number-${bill.id}`}>
               {bill.billNumber}
@@ -51,7 +52,7 @@ export function BillCard({ bill }: BillCardProps) {
             <StatusBadge status={bill.status} />
           </div>
           <div className="flex items-center gap-2">
-            <TopicBadge topic={bill.topic} />
+            <TopicBadge topic={bill.topic} className="text-xs sm:text-sm" />
             <ShareButton
               title={bill.title}
               billNumber={bill.billNumber}
@@ -64,69 +65,75 @@ export function BillCard({ bill }: BillCardProps) {
           </div>
         </div>
 
+        {/* Clickable title with better tap target on mobile */}
         <Link href={`/bill/${bill.id}`}>
           <h3
-            className="text-xl font-medium text-foreground mb-3 line-clamp-2 hover:text-primary cursor-pointer"
+            className="text-lg sm:text-xl font-medium text-foreground mb-3 line-clamp-2 hover:text-primary cursor-pointer leading-tight"
             data-testid={`text-bill-title-${bill.id}`}
           >
             {bill.title}
           </h3>
         </Link>
 
+        {/* Summary - clamp to 2 lines on mobile, 3 on desktop */}
         <p
-          className="text-base text-muted-foreground leading-relaxed mb-4 line-clamp-3"
+          className="text-sm sm:text-base text-muted-foreground leading-relaxed mb-4 line-clamp-2 sm:line-clamp-3"
           data-testid={`text-bill-summary-${bill.id}`}
         >
           {bill.summary}
         </p>
 
-        <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-border">
-          <div className="flex flex-wrap items-center gap-4">
+        {/* Meta info - responsive stacking */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 pt-4 border-t border-border">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm">
             {bill.voteDate && (
-              <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                <Calendar className="h-4 w-4" />
-                <span data-testid={`text-vote-date-${bill.id}`}>Vote: {bill.voteDate}</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground">
+                <Calendar className="h-4 w-4 flex-shrink-0" />
+                <span data-testid={`text-vote-date-${bill.id}`} className="hidden sm:inline">Vote: {bill.voteDate}</span>
+                <span data-testid={`text-vote-date-mobile-${bill.id}`} className="sm:hidden">{bill.voteDate}</span>
               </div>
             )}
-            <span className="text-xs text-muted-foreground" data-testid={`text-source-label-${bill.id}`}>
-              {safeSourceUrl ? "Official source" : "Community submitted"}
+            <span className="text-muted-foreground" data-testid={`text-source-label-${bill.id}`}>
+              {safeSourceUrl ? "Official" : "Community"}
             </span>
             {safeSourceUrl && (
-              <a 
+              <a
                 href={safeSourceUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline flex items-center gap-1"
+                className="text-primary hover:underline flex items-center gap-1 min-h-[44px] sm:min-h-0 -my-2 sm:my-0"
                 data-testid={`link-source-${bill.id}`}
                 aria-label={`View official source for ${bill.billNumber}`}
               >
                 <ExternalLink className="h-3 w-3" />
-                Source
+                <span>Source</span>
               </a>
             )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-              <MessageSquare className="h-4 w-4" />
-              <span data-testid={`text-comments-${bill.id}`}>{bill.commentCount} comments</span>
+          {/* Engagement metrics */}
+          <div className="flex items-center gap-3 sm:gap-4 text-sm">
+            <div className="flex items-center gap-1.5 text-muted-foreground">
+              <MessageSquare className="h-4 w-4 flex-shrink-0" />
+              <span data-testid={`text-comments-${bill.id}`}>{bill.commentCount}</span>
             </div>
 
-            <div className="flex items-center gap-2 text-sm">
+            <div className="flex items-center gap-2">
               <span className="flex items-center gap-1 text-chart-2">
-                <ThumbsUp className="h-4 w-4" />
+                <ThumbsUp className="h-4 w-4 flex-shrink-0" />
                 <span data-testid={`text-support-${bill.id}`}>{bill.supportVotes}</span>
               </span>
               <span className="text-muted-foreground">/</span>
               <span className="flex items-center gap-1 text-destructive">
-                <ThumbsDown className="h-4 w-4" />
+                <ThumbsDown className="h-4 w-4 flex-shrink-0" />
                 <span data-testid={`text-oppose-${bill.id}`}>{bill.opposeVotes}</span>
               </span>
             </div>
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mt-4" asChild>
+        {/* Full-width button with proper touch target */}
+        <Button variant="outline" size="default" className="w-full mt-4 min-h-[44px]" asChild>
           <Link href={`/bill/${bill.id}`} data-testid={`button-view-details-${bill.id}`}>
             View Details
           </Link>
