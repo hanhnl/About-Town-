@@ -147,35 +147,34 @@ async function makeOpenStatesRequest<T>(
     }
   }
 
-  return retryWithBackoff(async () => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+  // Direct call without retries to stay within Vercel's 10s limit
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout to allow overhead
 
-    try {
-      const response = await fetch(url.toString(), {
-        headers: {
-          'Accept': 'application/json',
-          'X-API-Key': apiKey,
-        },
-        signal: controller.signal,
-      });
+  try {
+    const response = await fetch(url.toString(), {
+      headers: {
+        'Accept': 'application/json',
+        'X-API-Key': apiKey,
+      },
+      signal: controller.signal,
+    });
 
-      clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        if (response.status === 429) {
-          throw new Error('Rate limit exceeded');
-        }
-        throw new Error(`OpenStates API responded with status ${response.status}`);
+    if (!response.ok) {
+      if (response.status === 429) {
+        throw new Error('Rate limit exceeded');
       }
-
-      const data = await response.json() as T;
-      return data;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
+      throw new Error(`OpenStates API responded with status ${response.status}`);
     }
-  }, 3, 2000);
+
+    const data = await response.json() as T;
+    return data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
 }
 
 // Cache for bills

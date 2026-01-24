@@ -1,7 +1,7 @@
 import express from "express";
 import { createServer } from "http";
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { registerRoutes } from "./server/routes";
+import { registerRoutes } from "./server/routes.js";
 
 // Create Express app
 const app = express();
