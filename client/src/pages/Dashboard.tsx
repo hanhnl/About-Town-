@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { useUserLocation } from "@/contexts/LocationContext";
 import { StatsCard } from "@/components/StatsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { BillCard, type Bill as BillCardType } from "@/components/BillCard";
@@ -8,7 +9,7 @@ import type { BillStatus } from "@/components/StatusBadge";
 import type { Topic } from "@/components/TopicBadge";
 import type { Bill } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Zap, FileText } from "lucide-react";
+import { Loader2, Zap, FileText, MapPin } from "lucide-react";
 
 function mapBillToCardFormat(bill: Bill): BillCardType {
   const statusMap: Record<string, BillStatus> = {
@@ -43,9 +44,14 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch bills from unified endpoint (handles both LegiScan and database)
+  // Get user's location from context
+  const { location: userLocation, hasJurisdiction } = useUserLocation();
+
+  // Conditionally fetch local bills (Montgomery County) or state bills
   const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
+    queryKey: hasJurisdiction
+      ? ["/api/real-bills", userLocation.jurisdiction?.id]
+      : ["/api/bills"],
     retry: 2,
   });
 
@@ -104,7 +110,10 @@ export default function Dashboard() {
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-3xl font-semibold text-foreground" data-testid="text-page-title">
-              Maryland State Legislation
+              {hasJurisdiction && userLocation.jurisdiction?.name
+                ? `${userLocation.jurisdiction.name} Legislation`
+                : "Maryland State Legislation"
+              }
             </h1>
             {hasLiveData ? (
               <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 gap-1">
@@ -118,10 +127,30 @@ export default function Dashboard() {
               </Badge>
             )}
           </div>
+          <div className="flex items-center gap-2 mb-2">
+            {userLocation.city && (
+              <Badge variant="secondary" className="gap-1">
+                <MapPin className="h-3 w-3" />
+                {userLocation.city}, MD ({userLocation.zipcode})
+              </Badge>
+            )}
+            {hasJurisdiction && (
+              <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                📍 Local Bills
+              </Badge>
+            )}
+            {!hasJurisdiction && (
+              <Badge className="bg-purple-500/10 text-purple-700 dark:text-purple-400">
+                🏛️ State Bills
+              </Badge>
+            )}
+          </div>
           <p className="text-lg text-muted-foreground">
             {(bills || []).length > 0
-              ? `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
-              : "Loading bills from Maryland legislature..."
+              ? hasJurisdiction
+                ? `Tracking ${(bills || []).length} local bills from ${userLocation.jurisdiction?.name || "your area"}`
+                : `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
+              : "Loading bills..."
             }
           </p>
         </div>
