@@ -49,15 +49,17 @@ export default function Dashboard() {
 
   // Fetch county bills (Montgomery County)
   const { data: countyBills = [], isLoading: isLoadingCounty } = useQuery<Bill[]>({
-    queryKey: ["/api/real-bills", userLocation.jurisdiction?.id],
+    queryKey: ["/api/real-bills", userLocation.jurisdiction?.id, userLocation.zipcode],
     enabled: hasJurisdiction, // Only fetch if user has a jurisdiction
     retry: 2,
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   });
 
   // Fetch state bills (Maryland House/Senate)
   const { data: stateBills = [], isLoading: isLoadingState } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
+    queryKey: ["/api/bills", userLocation.zipcode],
     retry: 2,
+    staleTime: 5 * 60 * 1000, // Consider data fresh for 5 minutes
   });
 
   // Combine bills: If user has jurisdiction, show both county AND state bills
