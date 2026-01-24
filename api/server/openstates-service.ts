@@ -152,6 +152,7 @@ async function makeOpenStatesRequest<T>(
   const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout to allow overhead
 
   try {
+    console.log(`[OpenStates] Requesting: ${url.pathname}${url.search}`);
     const response = await fetch(url.toString(), {
       headers: {
         'Accept': 'application/json',
@@ -163,10 +164,12 @@ async function makeOpenStatesRequest<T>(
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[OpenStates] API error ${response.status}: ${errorText}`);
       if (response.status === 429) {
         throw new Error('Rate limit exceeded');
       }
-      throw new Error(`OpenStates API responded with status ${response.status}`);
+      throw new Error(`OpenStates API responded with status ${response.status}: ${errorText.substring(0, 200)}`);
     }
 
     const data = await response.json() as T;
@@ -232,7 +235,7 @@ export async function getMarylandBills(options: {
     }
 
     const params: Record<string, string> = {
-      jurisdiction: 'Maryland',
+      jurisdiction: 'md',  // OpenStates v3 uses lowercase state abbreviations
       per_page: String(Math.min(limit, 100)), // API max is 100 per page
     };
 
