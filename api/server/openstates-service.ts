@@ -237,6 +237,7 @@ export async function getMarylandBills(options: {
     const params: Record<string, string> = {
       jurisdiction: 'md',  // OpenStates v3 uses lowercase state abbreviations
       per_page: String(Math.min(limit, 100)), // API max is 100 per page
+      include: 'sponsorships,abstracts', // Include related data inline (reduces API calls)
     };
 
     if (search) {
@@ -310,8 +311,11 @@ export async function getMarylandBills(options: {
 export async function getBillDetail(billId: string): Promise<OpenStatesBillDetail | null> {
   try {
     console.log(`🔄 Fetching bill detail for ${billId} from OpenStates...`);
-    const bill = await makeOpenStatesRequest<OpenStatesBillDetail>(`/bills/${billId}`, {});
-    console.log(`✅ Fetched bill detail for ${billId}`);
+    // Include comprehensive details for bill detail page
+    const bill = await makeOpenStatesRequest<OpenStatesBillDetail>(`/bills/${billId}`, {
+      include: 'sponsorships,abstracts,actions,sources,versions,votes'
+    });
+    console.log(`✅ Fetched bill detail for ${billId} with full details`);
     return bill;
   } catch (error) {
     console.error(`Error fetching bill detail for ${billId}:`, error);

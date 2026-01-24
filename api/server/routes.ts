@@ -564,6 +564,34 @@ export async function registerRoutes(
     }
   });
 
+  // Montgomery County zipcodes (hardcoded for quick deployment)
+  const MONTGOMERY_COUNTY_ZIPCODES = new Set([
+    // Silver Spring area
+    "20901", "20902", "20903", "20904", "20905", "20906", "20910", "20912", "20913", "20914", "20915", "20916",
+    // Bethesda
+    "20814", "20815", "20816", "20817",
+    // Rockville
+    "20850", "20851", "20852", "20853", "20854", "20855",
+    // Gaithersburg
+    "20877", "20878", "20879", "20882", "20883", "20884", "20885", "20886",
+    // Germantown
+    "20874", "20875", "20876",
+    // Potomac
+    "20854", "20859",
+    // Kensington
+    "20895",
+    // Poolesville
+    "20837",
+    // Damascus
+    "20872",
+    // Olney
+    "20832",
+    // Clarksburg
+    "20871",
+    // Takoma Park (partial)
+    "20912",
+  ]);
+
   app.get("/api/zipcodes/lookup/:zipcode", async (req, res) => {
     try {
       const zipcode = req.params.zipcode;
@@ -592,8 +620,28 @@ export async function registerRoutes(
         }
       }
 
-      // Accept all zipcodes - Maryland state legislation available for all
-      // User can browse bills from LegiScan API
+      // Check if it's a Montgomery County zipcode (hardcoded fallback)
+      if (MONTGOMERY_COUNTY_ZIPCODES.has(zipcode)) {
+        console.log(`✅ Montgomery County zipcode detected: ${zipcode}`);
+        return res.json({
+          zipcode,
+          city: "Montgomery County",
+          state: 'MD',
+          neighborhoods: null,
+          jurisdiction: {
+            id: 1,
+            name: "Montgomery County",
+            type: "county",
+            level: "local"
+          },
+          supported: true,
+          hasJurisdiction: true,
+          message: "Showing Montgomery County legislation"
+        });
+      }
+
+      // Accept all other zipcodes - Maryland state legislation available
+      console.log(`ℹ️  Non-Montgomery County zipcode: ${zipcode} - showing state bills`);
       return res.json({
         zipcode,
         city: null,
