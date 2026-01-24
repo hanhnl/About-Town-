@@ -47,18 +47,37 @@ export default function Dashboard() {
   // Get user's location from context
   const { location: userLocation, hasJurisdiction } = useUserLocation();
 
-  // Conditionally fetch local bills (Montgomery County) or state bills
-  const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: hasJurisdiction
-      ? ["/api/real-bills", userLocation.jurisdiction?.id]
-      : ["/api/bills"],
+  // Fetch county bills (Montgomery County)
+  const { data: countyBills = [], isLoading: isLoadingCounty } = useQuery<Bill[]>({
+    queryKey: ["/api/real-bills", userLocation.jurisdiction?.id],
+    enabled: hasJurisdiction, // Only fetch if user has a jurisdiction
     retry: 2,
   });
 
+  // Fetch state bills (Maryland House/Senate)
+  const { data: stateBills = [], isLoading: isLoadingState } = useQuery<Bill[]>({
+    queryKey: ["/api/bills"],
+    retry: 2,
+  });
+
+  // Combine bills: If user has jurisdiction, show both county AND state bills
+  // Otherwise, show only state bills
+  const bills = useMemo(() => {
+    if (hasJurisdiction) {
+      // Montgomery County residents see BOTH county and state bills
+      return [...countyBills, ...stateBills];
+    }
+    // Other Maryland residents see only state bills
+    return stateBills;
+  }, [hasJurisdiction, countyBills, stateBills]);
+
+  const isLoading = isLoadingCounty || isLoadingState;
+
   // Debug: Log what we received from API
-  console.log('[Dashboard] API response - bills:', bills);
-  console.log('[Dashboard] Bills count:', (bills || []).length);
-  console.log('[Dashboard] Bills type:', typeof bills, Array.isArray(bills));
+  console.log('[Dashboard] County bills:', countyBills.length);
+  console.log('[Dashboard] State bills:', stateBills.length);
+  console.log('[Dashboard] Combined bills:', bills.length);
+  console.log('[Dashboard] Has jurisdiction:', hasJurisdiction);
 
   const filteredBills = useMemo(() => {
     const mappedBills = (bills || []).map(mapBillToCardFormat);
@@ -111,7 +130,7 @@ export default function Dashboard() {
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-3xl font-semibold text-foreground" data-testid="text-page-title">
               {hasJurisdiction && userLocation.jurisdiction?.name
-                ? `${userLocation.jurisdiction.name} Legislation`
+                ? `${userLocation.jurisdiction.name} & Maryland Legislation`
                 : "Maryland State Legislation"
               }
             </h1>
@@ -127,7 +146,7 @@ export default function Dashboard() {
               </Badge>
             )}
           </div>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
             {userLocation.city && (
               <Badge variant="secondary" className="gap-1">
                 <MapPin className="h-3 w-3" />
@@ -135,20 +154,25 @@ export default function Dashboard() {
               </Badge>
             )}
             {hasJurisdiction && (
-              <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400">
-                📍 Local Bills
-              </Badge>
+              <>
+                <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400">
+                  📍 {countyBills.length} County Bills
+                </Badge>
+                <Badge className="bg-purple-500/10 text-purple-700 dark:text-purple-400">
+                  🏛️ {stateBills.length} State Bills
+                </Badge>
+              </>
             )}
             {!hasJurisdiction && (
               <Badge className="bg-purple-500/10 text-purple-700 dark:text-purple-400">
-                🏛️ State Bills
+                🏛️ State Bills Only
               </Badge>
             )}
           </div>
           <p className="text-lg text-muted-foreground">
             {(bills || []).length > 0
               ? hasJurisdiction
-                ? `Tracking ${(bills || []).length} local bills from ${userLocation.jurisdiction?.name || "your area"}`
+                ? `Tracking ${countyBills.length} ${userLocation.jurisdiction?.name || "county"} bills + ${stateBills.length} Maryland state bills`
                 : `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
               : "Loading bills..."
             }
