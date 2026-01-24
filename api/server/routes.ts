@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
-import { isDatabaseConfigured } from "./db";
-import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
-import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
-import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
-import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
+import { storage } from "./storage.js";
+import { isDatabaseConfigured } from "./db.js";
+import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema.js";
+import { fetchRealBills, dataSources } from "./external-apis.js";
+import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service.js";
+import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service.js";
+import { apiRateLimiter, authRateLimiter } from "./rate-limiter.js";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format

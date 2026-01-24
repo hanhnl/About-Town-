@@ -15,8 +15,8 @@ import {
   type Amendment, type InsertAmendment,
   type BillStar, type InsertBillStar,
   type NewsletterSubscription, type InsertNewsletterSubscription
-} from "../shared/schema";
-import { db, isDatabaseConfigured } from "./db";
+} from "../shared/schema.js";
+import { db, isDatabaseConfigured } from "./db.js";
 import { eq, ilike, and, or, desc, sql } from "drizzle-orm";
 
 export interface IStorage {
