@@ -1,0 +1,137 @@
+# About Town - Robots Exclusion Protocol
+# This file tells web crawlers what they can and cannot access
+
+# Allow legitimate search engines to index public pages
+User-agent: Googlebot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+User-agent: DuckDuckBot
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+User-agent: Slurp
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+User-agent: Yandex
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+User-agent: Baiduspider
+Allow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+
+# Allow social media bots for link previews
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: Slackbot
+Allow: /
+
+# Block all other bots and scrapers
+User-agent: *
+Disallow: /
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /my-profile
+Disallow: /signup
+Disallow: /representatives
+
+# Explicitly block known scrapers
+User-agent: Scrapy
+Disallow: /
+
+User-agent: python-requests
+Disallow: /
+
+User-agent: curl
+Disallow: /
+
+User-agent: wget
+Disallow: /
+
+User-agent: HTTrack
+Disallow: /
+
+User-agent: WebCopier
+Disallow: /
+
+User-agent: SiteSnagger
+Disallow: /
+
+User-agent: TeleportPro
+Disallow: /
+
+User-agent: WebStripper
+Disallow: /
+
+User-agent: WebZIP
+Disallow: /
+
+User-agent: Offline Explorer
+Disallow: /
+
+User-agent: NPBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: BLEXBot
+Disallow: /
+
+User-agent: DataForSeoBot
+Disallow: /
+
+User-agent: serpstatbot
+Disallow: /
+
+# Crawl delay for any bots that do access (10 seconds between requests)
+Crawl-delay: 10
+
+# Sitemap location
+Sitemap: https://abouttown.me/sitemap.xml

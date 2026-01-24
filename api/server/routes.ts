@@ -6,7 +6,14 @@ import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUser
 import { fetchRealBills, dataSources } from "./external-apis";
 import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
 import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
-import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
+import { apiRateLimiter, authRateLimiter, burstRateLimiter, sensitiveRateLimiter } from "./rate-limiter";
+import {
+  botDetectionMiddleware,
+  honeypotMiddleware,
+  securityHeadersMiddleware,
+  requestFingerprintMiddleware,
+  getBlockedIPCount
+} from "./bot-detection";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format
@@ -41,8 +48,73 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Apply rate limiting to all API routes
+  // ===========================================
+  // ANTI-SCRAPING & SECURITY MIDDLEWARE
+  // Applied in order: Security Headers -> Bot Detection -> Fingerprinting -> Rate Limiting
+  // ===========================================
+
+  // 1. Security headers for all requests
+  app.use(securityHeadersMiddleware());
+
+  // 2. Bot detection - block known scrapers and suspicious User-Agents
+  app.use('/api', botDetectionMiddleware({
+    blockBots: true,
+    allowSearchEngines: true,
+    strictMode: true,
+    logSuspicious: true,
+  }));
+
+  // 3. Request fingerprinting - detect rapid identical requests
+  app.use('/api', requestFingerprintMiddleware());
+
+  // 4. Burst rate limiting - prevent rapid-fire requests
+  app.use('/api', burstRateLimiter.middleware());
+
+  // 5. Standard rate limiting for all API routes
   app.use('/api', apiRateLimiter.middleware());
+
+  // ===========================================
+  // HONEYPOT ENDPOINTS - Trap scrapers
+  // These look like real endpoints but are traps
+  // ===========================================
+  app.get('/api/v1/bills', honeypotMiddleware());
+  app.get('/api/v2/bills', honeypotMiddleware());
+  app.get('/api/export', honeypotMiddleware());
+  app.get('/api/download', honeypotMiddleware());
+  app.get('/api/dump', honeypotMiddleware());
+  app.get('/api/all-data', honeypotMiddleware());
+  app.get('/api/bulk', honeypotMiddleware());
+  app.get('/api/backup', honeypotMiddleware());
+  app.get('/api/data.json', honeypotMiddleware());
+  app.get('/api/bills.json', honeypotMiddleware());
+  app.get('/api/sitemap', honeypotMiddleware());
+  app.get('/api/admin', honeypotMiddleware());
+  app.get('/api/internal', honeypotMiddleware());
+  app.get('/wp-admin', honeypotMiddleware());
+  app.get('/wp-login.php', honeypotMiddleware());
+  app.get('/.env', honeypotMiddleware());
+  app.get('/.git/config', honeypotMiddleware());
+
+  // Security monitoring endpoint (protected)
+  app.get("/api/security/status", sensitiveRateLimiter.middleware(), async (_req, res) => {
+    try {
+      const blockedIPs = getBlockedIPCount();
+      res.json({
+        status: 'operational',
+        blockedIPs,
+        protections: {
+          botDetection: true,
+          rateLimit: true,
+          fingerprinting: true,
+          honeypots: true,
+          securityHeaders: true,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to get security status' });
+    }
+  });
 
   // Diagnostic endpoint - visit this to check if APIs are working
   app.get("/api/debug/status", async (_req, res) => {
