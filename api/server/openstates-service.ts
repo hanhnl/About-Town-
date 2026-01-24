@@ -184,7 +184,7 @@ async function makeOpenStatesRequest<T>(
 let billsCache: { data: NormalizedBill[]; timestamp: number } | null = null;
 const BILLS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
-function inferStatusFromActions(
+export function inferStatusFromActions(
   latestAction: string,
   classification: string[]
 ): string {

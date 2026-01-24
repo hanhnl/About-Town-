@@ -5,7 +5,7 @@ import { isDatabaseConfigured } from "./db.js";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema.js";
 import { fetchRealBills, dataSources } from "./external-apis.js";
 import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service.js";
-import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service.js";
+import { getMarylandBills as getOpenStatesBills, getBillDetail as getOpenStatesBillDetail, inferStatusFromActions as inferOpenStatesStatus, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service.js";
 import { apiRateLimiter, authRateLimiter } from "./rate-limiter.js";
 import { z } from "zod";
 
@@ -342,13 +342,70 @@ export async function registerRoutes(
 
   app.get("/api/bills/:id", async (req, res) => {
     try {
-      const id = parseInt(req.params.id);
-      const bill = await storage.getBill(id);
-      if (!bill) {
-        return res.status(404).json({ error: "Bill not found" });
+      const idParam = req.params.id;
+
+      // Try database first (integer ID for local bills)
+      const numericId = parseInt(idParam);
+      if (!isNaN(numericId)) {
+        const dbBill = await storage.getBill(numericId);
+        if (dbBill) {
+          return res.json(dbBill);
+        }
       }
-      res.json(bill);
+
+      // If not found in database, try OpenStates API (string ID like "ocd-bill/...")
+      if (isOpenStatesConfigured()) {
+        try {
+          console.log(`🔄 Fetching bill detail from OpenStates: ${idParam}`);
+          const openStatesBill = await getOpenStatesBillDetail(idParam);
+
+          if (openStatesBill) {
+            // Convert to frontend format
+            const bill = {
+              id: openStatesBill.id,
+              billNumber: openStatesBill.identifier,
+              title: openStatesBill.title,
+              summary: openStatesBill.abstracts?.[0]?.abstract || openStatesBill.title,
+              status: inferOpenStatesStatus(openStatesBill.latest_action_description || '', []),
+              topic: inferTopicFromSubjects(
+                openStatesBill.subject || [],
+                openStatesBill.title,
+                openStatesBill.abstracts?.[0]?.abstract || ''
+              ),
+              voteDate: openStatesBill.latest_passage_date || openStatesBill.latest_action_date || new Date().toISOString().split('T')[0],
+              supportVotes: 0, // OpenStates provides votes array, would need to sum
+              opposeVotes: 0,
+              sourceUrl: openStatesBill.openstates_url || openStatesBill.sources?.[0]?.url || 'https://mgaleg.maryland.gov/',
+              isLiveData: true,
+              lastAction: openStatesBill.latest_action_description || 'No action recorded',
+              actions: openStatesBill.actions?.slice(0, 10).map(a => ({
+                date: a.date,
+                description: a.description,
+                type: a.classification.join(', ')
+              })) || [],
+              sponsors: openStatesBill.sponsorships?.map(s => ({
+                name: s.name,
+                role: s.classification || 'Sponsor',
+                primary: s.primary
+              })) || [],
+              versions: openStatesBill.versions?.map(v => ({
+                note: v.note,
+                date: v.date,
+                url: v.links?.[0]?.url
+              })) || []
+            };
+
+            console.log(`✅ Fetched bill detail from OpenStates: ${openStatesBill.identifier}`);
+            return res.json(bill);
+          }
+        } catch (openStatesError) {
+          console.warn(`⚠️  Failed to fetch bill from OpenStates:`, openStatesError);
+        }
+      }
+
+      return res.status(404).json({ error: "Bill not found" });
     } catch (error) {
+      console.error('Error in /api/bills/:id:', error);
       res.status(500).json({ error: "Failed to fetch bill" });
     }
   });
