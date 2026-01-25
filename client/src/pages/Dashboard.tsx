@@ -8,7 +8,8 @@ import type { BillStatus } from "@/components/StatusBadge";
 import type { Topic } from "@/components/TopicBadge";
 import type { Bill } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Zap, FileText } from "lucide-react";
+import { Loader2, Zap, FileText, MapPin } from "lucide-react";
+import { useUserLocation } from "@/contexts/LocationContext";
 
 function mapBillToCardFormat(bill: Bill): BillCardType {
   const statusMap: Record<string, BillStatus> = {
@@ -43,11 +44,29 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch bills from unified endpoint (handles both LegiScan and database)
-  const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
+  // Get user's location from context
+  const { location: userLocation, isLoading: locationLoading } = useUserLocation();
+  const zipcode = userLocation.zipcode;
+
+  // Build API URL with zipcode as query parameter
+  const apiUrl = zipcode ? `/api/bills?zipcode=${zipcode}` : '/api/bills';
+
+  // Fetch bills from unified endpoint - now includes zipcode for location-aware results
+  const { data: billsResponse, isLoading: billsLoading } = useQuery<{
+    bills: Bill[];
+    jurisdiction?: string;
+    sources?: string[];
+  } | Bill[]>({
+    queryKey: [apiUrl],
     retry: 2,
   });
+
+  // Handle both old array format and new object format
+  const bills = Array.isArray(billsResponse) ? billsResponse : (billsResponse?.bills || []);
+  const jurisdiction = !Array.isArray(billsResponse) ? billsResponse?.jurisdiction : undefined;
+  const sources = !Array.isArray(billsResponse) ? billsResponse?.sources : undefined;
+
+  const isLoading = locationLoading || billsLoading;
 
   // Debug: Log what we received from API
   console.log('[Dashboard] API response - bills:', bills);
@@ -102,9 +121,12 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
-          <div className="flex items-center gap-3 mb-3">
+          <div className="flex items-center gap-3 mb-3 flex-wrap">
             <h1 className="text-3xl font-semibold text-foreground" data-testid="text-page-title">
-              Maryland State Legislation
+              {jurisdiction === 'montgomery_county'
+                ? 'Montgomery County & Maryland Legislation'
+                : 'Maryland State Legislation'
+              }
             </h1>
             {hasLiveData ? (
               <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 gap-1">
@@ -117,13 +139,26 @@ export default function Dashboard() {
                 Sample Data
               </Badge>
             )}
+            {zipcode && (
+              <Badge variant="outline" className="gap-1 text-muted-foreground">
+                <MapPin className="h-3 w-3" />
+                {zipcode}
+              </Badge>
+            )}
           </div>
           <p className="text-lg text-muted-foreground">
             {(bills || []).length > 0
-              ? `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
-              : "Loading bills from Maryland legislature..."
+              ? jurisdiction === 'montgomery_county'
+                ? `Tracking ${(bills || []).length} bills from Montgomery County Council and Maryland General Assembly`
+                : `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
+              : "Loading bills from legislature..."
             }
           </p>
+          {sources && sources.length > 0 && (
+            <p className="text-sm text-muted-foreground mt-1">
+              Sources: {sources.join(', ')}
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

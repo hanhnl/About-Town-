@@ -44,6 +44,21 @@ function inferTopicFromSubjects(subjects: string[], title: string, description: 
   return 'other';
 }
 
+// Helper function to infer topic from bill title only (for county bills)
+function inferTopicFromTitle(title: string): string {
+  const text = title.toLowerCase();
+
+  if (text.includes('education') || text.includes('school') || text.includes('student')) return 'education';
+  if (text.includes('housing') || text.includes('tenant') || text.includes('rental') || text.includes('affordable')) return 'housing';
+  if (text.includes('transport') || text.includes('road') || text.includes('transit') || text.includes('traffic')) return 'transportation';
+  if (text.includes('health') || text.includes('medical') || text.includes('hospital')) return 'healthcare';
+  if (text.includes('environment') || text.includes('energy') || text.includes('climate') || text.includes('bag') || text.includes('plastic')) return 'environment';
+  if (text.includes('budget') || text.includes('tax') || text.includes('revenue') || text.includes('fiscal')) return 'budget';
+  if (text.includes('public safety') || text.includes('police') || text.includes('crime') || text.includes('animal')) return 'public_safety';
+
+  return 'other';
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -176,9 +191,72 @@ export async function registerRoutes(
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const topic = req.query.topic as string | undefined;
+    const zipcode = req.query.zipcode as string | undefined;
     const usePagination = page > 0;
 
+    // Montgomery County zipcodes (all start with 208xx or 209xx in MD)
+    const MONTGOMERY_COUNTY_ZIPCODES = [
+      '20812', '20814', '20815', '20816', '20817', '20818', '20824', '20825',
+      '20827', '20832', '20833', '20837', '20838', '20839', '20841', '20842',
+      '20850', '20851', '20852', '20853', '20854', '20855', '20860', '20861',
+      '20862', '20866', '20868', '20871', '20872', '20874', '20875', '20876',
+      '20877', '20878', '20879', '20880', '20882', '20883', '20884', '20885',
+      '20886', '20889', '20891', '20892', '20894', '20895', '20896', '20897',
+      '20898', '20899', '20901', '20902', '20903', '20904', '20905', '20906',
+      '20907', '20908', '20910', '20911', '20912', '20913', '20914', '20915',
+      '20916', '20918', '20993', '20997',
+    ];
+
+    // Determine jurisdiction based on zipcode
+    const isMongtomeryCounty = zipcode && MONTGOMERY_COUNTY_ZIPCODES.includes(zipcode);
+    const jurisdiction = isMongtomeryCounty ? 'montgomery_county' : 'maryland_state';
+
+    console.log(`📍 /api/bills - Zipcode: ${zipcode || 'none'}, Jurisdiction: ${jurisdiction}`);
+
     try {
+      let allBills: any[] = [];
+      const sources: string[] = [];
+
+      // ===========================================
+      // FETCH COUNTY BILLS (if Montgomery County)
+      // ===========================================
+      if (isMongtomeryCounty) {
+        try {
+          console.log('🏛️  Fetching Montgomery County bills...');
+          const countyBills = await fetchRealBills({ limit: 30, search });
+
+          if (countyBills.length > 0) {
+            // Convert county bill format to unified format
+            const formattedCountyBills = countyBills.map((bill, index) => ({
+              id: `mc-${bill.billNumber}-${index}`,
+              billNumber: `MC ${bill.billNumber}`,
+              title: bill.title,
+              summary: `Montgomery County legislation. Sponsors: ${bill.sponsors.join(', ')}. ${bill.finalVote || ''}`,
+              status: bill.status,
+              topic: inferTopicFromTitle(bill.title),
+              voteDate: bill.actionDate || bill.introductionDate || new Date().toISOString().split('T')[0],
+              supportVotes: bill.yesVotes.length,
+              opposeVotes: bill.noVotes.length,
+              sourceUrl: bill.sourceUrl,
+              isLiveData: bill.isLiveData,
+              isCountyBill: true,
+              jurisdiction: 'montgomery_county',
+            }));
+
+            allBills = [...allBills, ...formattedCountyBills];
+            sources.push('Montgomery County Open Data');
+            console.log(`✅ Added ${formattedCountyBills.length} Montgomery County bills`);
+          }
+        } catch (countyError) {
+          console.warn('⚠️  Montgomery County API failed:', countyError);
+        }
+      }
+
+      // ===========================================
+      // FETCH STATE BILLS (OpenStates or LegiScan)
+      // ===========================================
+      let stateBillsFetched = false;
+
       // Try OpenStates API first (primary data source)
       if (isOpenStatesConfigured()) {
         try {
@@ -187,7 +265,7 @@ export async function registerRoutes(
 
           if (openStatesBills.length > 0) {
             // Convert OpenStates format to frontend format
-            let bills = openStatesBills.map((bill) => ({
+            const formattedStateBills = openStatesBills.map((bill) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
               title: bill.title,
@@ -200,34 +278,14 @@ export async function registerRoutes(
               sourceUrl: bill.url,
               isLiveData: true,
               lastAction: bill.lastAction,
+              isCountyBill: false,
+              jurisdiction: 'maryland_state',
             }));
 
-            // Apply filters
-            if (status && status !== 'all') {
-              bills = bills.filter(bill => bill.status === status);
-            }
-            if (topic && topic !== 'all') {
-              bills = bills.filter(bill => bill.topic === topic);
-            }
-
-            // Apply pagination if requested
-            if (usePagination) {
-              const startIndex = (page - 1) * limit;
-              const endIndex = startIndex + limit;
-              const paginatedBills = bills.slice(startIndex, endIndex);
-
-              console.log(`✅ Returning ${paginatedBills.length} bills from OpenStates API (page ${page})`);
-              return res.json({
-                bills: paginatedBills,
-                total: bills.length,
-                page,
-                limit,
-                totalPages: Math.ceil(bills.length / limit)
-              });
-            } else {
-              console.log(`✅ Returning ${bills.length} bills from OpenStates API`);
-              return res.json(bills.slice(0, limit));
-            }
+            allBills = [...allBills, ...formattedStateBills];
+            sources.push('OpenStates (Maryland)');
+            stateBillsFetched = true;
+            console.log(`✅ Added ${formattedStateBills.length} state bills from OpenStates`);
           }
         } catch (openStatesError) {
           console.warn('⚠️  OpenStates API failed, falling back to LegiScan:', openStatesError);
@@ -235,14 +293,14 @@ export async function registerRoutes(
       }
 
       // Fallback to LegiScan API
-      if (isLegiScanConfigured()) {
+      if (!stateBillsFetched && isLegiScanConfigured()) {
         try {
           console.log('🔄 Fetching bills from LegiScan API...');
           const legiScanBills = await getLegiScanBills({ limit: limit * (page || 1), search });
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
-            let bills = legiScanBills.map((bill) => ({
+            const formattedStateBills = legiScanBills.map((bill) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
               title: bill.title,
@@ -255,146 +313,165 @@ export async function registerRoutes(
               sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
               isLiveData: true,
               lastAction: bill.lastAction,
+              isCountyBill: false,
+              jurisdiction: 'maryland_state',
             }));
 
-            // Apply filters
-            if (status && status !== 'all') {
-              bills = bills.filter(bill => bill.status === status);
-            }
-            if (topic && topic !== 'all') {
-              bills = bills.filter(bill => bill.topic === topic);
-            }
-
-            // Apply pagination if requested
-            if (usePagination) {
-              const startIndex = (page - 1) * limit;
-              const endIndex = startIndex + limit;
-              const paginatedBills = bills.slice(startIndex, endIndex);
-
-              console.log(`✅ Returning ${paginatedBills.length} bills from LegiScan API (page ${page})`);
-              return res.json({
-                bills: paginatedBills,
-                total: bills.length,
-                page,
-                limit,
-                totalPages: Math.ceil(bills.length / limit)
-              });
-            } else {
-              console.log(`✅ Returning ${bills.length} bills from LegiScan API`);
-              return res.json(bills.slice(0, limit));
-            }
+            allBills = [...allBills, ...formattedStateBills];
+            sources.push('LegiScan (Maryland)');
+            stateBillsFetched = true;
+            console.log(`✅ Added ${formattedStateBills.length} state bills from LegiScan`);
           }
         } catch (legiScanError) {
           console.warn('⚠️  LegiScan API failed, falling back to sample data:', legiScanError);
         }
-      } else {
-        console.log('ℹ️  No external API keys configured, using sample data');
       }
 
-      // Fallback to hardcoded sample bills
-      const sampleBills = [
-        {
-          id: 1,
-          billNumber: "HB0001",
-          title: "Maryland Education Reform Act",
-          summary: "Establishes new funding mechanisms for public schools across Maryland, focusing on equity and access to resources.",
-          status: "in_committee",
-          topic: "education",
-          voteDate: "2025-03-15",
-          supportVotes: 45,
-          opposeVotes: 12,
-          sourceUrl: "https://mgaleg.maryland.gov/",
-          isLiveData: false,
-        },
-        {
-          id: 2,
-          billNumber: "SB0123",
-          title: "Clean Energy Initiative",
-          summary: "Expands Maryland's renewable energy portfolio and sets aggressive targets for carbon emissions reduction by 2030.",
-          status: "passed",
-          topic: "environment",
-          voteDate: "2025-02-28",
-          supportVotes: 67,
-          opposeVotes: 8,
-          sourceUrl: "https://mgaleg.maryland.gov/",
-          isLiveData: false,
-        },
-        {
-          id: 3,
-          billNumber: "HB0456",
-          title: "Affordable Housing Development Act",
-          summary: "Provides tax incentives for developers building affordable housing units in high-demand areas across the state.",
-          status: "introduced",
-          topic: "housing",
-          voteDate: "2025-04-01",
-          supportVotes: 23,
-          opposeVotes: 5,
-          sourceUrl: "https://mgaleg.maryland.gov/",
-          isLiveData: false,
-        },
-        {
-          id: 4,
-          billNumber: "SB0789",
-          title: "Transportation Infrastructure Improvement",
-          summary: "Allocates funding for road, bridge, and public transit improvements throughout Maryland.",
-          status: "in_committee",
-          topic: "transportation",
-          voteDate: "2025-03-20",
-          supportVotes: 34,
-          opposeVotes: 15,
-          sourceUrl: "https://mgaleg.maryland.gov/",
-          isLiveData: false,
-        },
-        {
-          id: 5,
-          billNumber: "HB0234",
-          title: "Healthcare Access Expansion",
-          summary: "Expands Medicaid coverage and reduces prescription drug costs for Maryland residents.",
-          status: "passed",
-          topic: "healthcare",
-          voteDate: "2025-02-15",
-          supportVotes: 52,
-          opposeVotes: 9,
-          sourceUrl: "https://mgaleg.maryland.gov/",
-          isLiveData: false,
-        },
-      ];
+      // ===========================================
+      // FALLBACK TO SAMPLE DATA (if no APIs work)
+      // ===========================================
+      if (allBills.length === 0) {
+        console.log('ℹ️  No external API data available, using sample data');
 
-      // Apply filters to sample bills
-      let filteredSampleBills = sampleBills;
+        const sampleBills = [
+          {
+            id: 1,
+            billNumber: "HB0001",
+            title: "Maryland Education Reform Act",
+            summary: "Establishes new funding mechanisms for public schools across Maryland, focusing on equity and access to resources.",
+            status: "in_committee",
+            topic: "education",
+            voteDate: "2025-03-15",
+            supportVotes: 45,
+            opposeVotes: 12,
+            sourceUrl: "https://mgaleg.maryland.gov/",
+            isLiveData: false,
+            isCountyBill: false,
+            jurisdiction: 'maryland_state',
+          },
+          {
+            id: 2,
+            billNumber: "SB0123",
+            title: "Clean Energy Initiative",
+            summary: "Expands Maryland's renewable energy portfolio and sets aggressive targets for carbon emissions reduction by 2030.",
+            status: "passed",
+            topic: "environment",
+            voteDate: "2025-02-28",
+            supportVotes: 67,
+            opposeVotes: 8,
+            sourceUrl: "https://mgaleg.maryland.gov/",
+            isLiveData: false,
+            isCountyBill: false,
+            jurisdiction: 'maryland_state',
+          },
+          {
+            id: 3,
+            billNumber: "HB0456",
+            title: "Affordable Housing Development Act",
+            summary: "Provides tax incentives for developers building affordable housing units in high-demand areas across the state.",
+            status: "introduced",
+            topic: "housing",
+            voteDate: "2025-04-01",
+            supportVotes: 23,
+            opposeVotes: 5,
+            sourceUrl: "https://mgaleg.maryland.gov/",
+            isLiveData: false,
+            isCountyBill: false,
+            jurisdiction: 'maryland_state',
+          },
+          {
+            id: 4,
+            billNumber: "SB0789",
+            title: "Transportation Infrastructure Improvement",
+            summary: "Allocates funding for road, bridge, and public transit improvements throughout Maryland.",
+            status: "in_committee",
+            topic: "transportation",
+            voteDate: "2025-03-20",
+            supportVotes: 34,
+            opposeVotes: 15,
+            sourceUrl: "https://mgaleg.maryland.gov/",
+            isLiveData: false,
+            isCountyBill: false,
+            jurisdiction: 'maryland_state',
+          },
+          {
+            id: 5,
+            billNumber: "HB0234",
+            title: "Healthcare Access Expansion",
+            summary: "Expands Medicaid coverage and reduces prescription drug costs for Maryland residents.",
+            status: "passed",
+            topic: "healthcare",
+            voteDate: "2025-02-15",
+            supportVotes: 52,
+            opposeVotes: 9,
+            sourceUrl: "https://mgaleg.maryland.gov/",
+            isLiveData: false,
+            isCountyBill: false,
+            jurisdiction: 'maryland_state',
+          },
+        ];
+
+        allBills = sampleBills;
+        sources.push('Sample Data');
+      }
+
+      // ===========================================
+      // APPLY FILTERS
+      // ===========================================
+      let filteredBills = allBills;
+
       if (status && status !== 'all') {
-        filteredSampleBills = filteredSampleBills.filter(bill => bill.status === status);
+        filteredBills = filteredBills.filter(bill => bill.status === status);
       }
       if (topic && topic !== 'all') {
-        filteredSampleBills = filteredSampleBills.filter(bill => bill.topic === topic);
+        filteredBills = filteredBills.filter(bill => bill.topic === topic);
       }
       if (search) {
         const query = search.toLowerCase();
-        filteredSampleBills = filteredSampleBills.filter(bill =>
+        filteredBills = filteredBills.filter(bill =>
           bill.title.toLowerCase().includes(query) ||
-          bill.summary.toLowerCase().includes(query) ||
+          (bill.summary || '').toLowerCase().includes(query) ||
           bill.billNumber.toLowerCase().includes(query)
         );
       }
 
-      // Return with or without pagination based on request
+      // Sort: County bills first (for Montgomery County users), then by date
+      filteredBills.sort((a, b) => {
+        // County bills first if user is in Montgomery County
+        if (isMongtomeryCounty) {
+          if (a.isCountyBill && !b.isCountyBill) return -1;
+          if (!a.isCountyBill && b.isCountyBill) return 1;
+        }
+        // Then sort by date (most recent first)
+        return new Date(b.voteDate || 0).getTime() - new Date(a.voteDate || 0).getTime();
+      });
+
+      // ===========================================
+      // RETURN RESPONSE
+      // ===========================================
       if (usePagination) {
         const startIndex = (page - 1) * limit;
         const endIndex = startIndex + limit;
-        const paginatedSampleBills = filteredSampleBills.slice(startIndex, endIndex);
+        const paginatedBills = filteredBills.slice(startIndex, endIndex);
 
-        console.log(`📊 /api/bills - Returning ${paginatedSampleBills.length} sample Maryland bills (page ${page})`);
-        res.json({
-          bills: paginatedSampleBills,
-          total: filteredSampleBills.length,
+        console.log(`📊 /api/bills - Returning ${paginatedBills.length} bills (page ${page}), jurisdiction: ${jurisdiction}`);
+        return res.json({
+          bills: paginatedBills,
+          total: filteredBills.length,
           page,
           limit,
-          totalPages: Math.ceil(filteredSampleBills.length / limit)
+          totalPages: Math.ceil(filteredBills.length / limit),
+          jurisdiction,
+          sources,
         });
       } else {
-        // Backwards compatible - return array
-        console.log(`📊 /api/bills - Returning ${filteredSampleBills.slice(0, limit).length} sample Maryland bills`);
-        res.json(filteredSampleBills.slice(0, limit));
+        const finalBills = filteredBills.slice(0, limit);
+        console.log(`📊 /api/bills - Returning ${finalBills.length} bills, jurisdiction: ${jurisdiction}`);
+        return res.json({
+          bills: finalBills,
+          jurisdiction,
+          sources,
+        });
       }
     } catch (error) {
       console.error('❌ Error in /api/bills:', error);
@@ -404,10 +481,16 @@ export async function registerRoutes(
           total: 0,
           page: 1,
           limit: 50,
-          totalPages: 0
+          totalPages: 0,
+          jurisdiction,
+          sources: [],
         });
       } else {
-        res.json([]);
+        res.json({
+          bills: [],
+          jurisdiction,
+          sources: [],
+        });
       }
     }
   });
