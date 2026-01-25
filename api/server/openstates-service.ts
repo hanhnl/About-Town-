@@ -80,6 +80,11 @@ export interface NormalizedBill {
   }>;
   subjects: string[];
   isLiveData: boolean;
+  // Real vote counts from OpenStates
+  yesVotes: number | null;
+  noVotes: number | null;
+  otherVotes: number | null;
+  voteResult: string | null;
 }
 
 const STATUS_MAP: Record<string, string> = {
@@ -218,12 +223,74 @@ function inferStatusFromActions(
   return 'introduced';
 }
 
+// Cache for bill vote counts (bill ID -> vote data)
+const voteCache = new Map<string, { yesVotes: number; noVotes: number; otherVotes: number; result: string }>();
+
+/**
+ * Fetch vote counts for a specific bill from OpenStates
+ */
+export async function getBillVotes(billId: string): Promise<{
+  yesVotes: number;
+  noVotes: number;
+  otherVotes: number;
+  result: string;
+} | null> {
+  // Check cache first
+  if (voteCache.has(billId)) {
+    return voteCache.get(billId)!;
+  }
+
+  try {
+    const detail = await getBillDetail(billId);
+    if (!detail || !detail.votes || detail.votes.length === 0) {
+      return null;
+    }
+
+    // Get the most recent vote (last in the array or the final passage vote)
+    const finalVote = detail.votes.find(v =>
+      v.motion_text.toLowerCase().includes('final') ||
+      v.motion_text.toLowerCase().includes('passage')
+    ) || detail.votes[detail.votes.length - 1];
+
+    let yesVotes = 0;
+    let noVotes = 0;
+    let otherVotes = 0;
+
+    for (const count of finalVote.counts) {
+      const option = count.option.toLowerCase();
+      if (option === 'yes' || option === 'yea' || option === 'aye') {
+        yesVotes = count.value;
+      } else if (option === 'no' || option === 'nay') {
+        noVotes = count.value;
+      } else {
+        otherVotes += count.value;
+      }
+    }
+
+    const result = {
+      yesVotes,
+      noVotes,
+      otherVotes,
+      result: finalVote.result || 'unknown',
+    };
+
+    // Cache the result
+    voteCache.set(billId, result);
+
+    return result;
+  } catch (error) {
+    console.warn(`[OpenStates] Failed to fetch votes for ${billId}:`, error);
+    return null;
+  }
+}
+
 export async function getMarylandBills(options: {
   limit?: number;
   search?: string;
   session?: string;
+  includeVotes?: boolean;
 } = {}): Promise<NormalizedBill[]> {
-  const { limit = 50, search, session } = options;
+  const { limit = 50, search, session, includeVotes = false } = options;
 
   try {
     // Check cache (only for non-search queries)
@@ -235,6 +302,7 @@ export async function getMarylandBills(options: {
     const params: Record<string, string> = {
       jurisdiction: 'Maryland',
       per_page: String(Math.min(limit, 100)), // API max is 100 per page
+      include: 'votes', // Request vote data in the response
     };
 
     if (search) {
@@ -247,7 +315,13 @@ export async function getMarylandBills(options: {
 
     console.log('🔄 Fetching bills from OpenStates API...');
     const response = await makeOpenStatesRequest<{
-      results: OpenStatesBill[];
+      results: (OpenStatesBill & {
+        votes?: Array<{
+          motion_text: string;
+          result: string;
+          counts: Array<{ option: string; value: number }>;
+        }>;
+      })[];
       pagination: {
         per_page: number;
         page: number;
@@ -262,6 +336,39 @@ export async function getMarylandBills(options: {
         bill.latest_action_description || '',
         []
       );
+
+      // Extract vote counts from included vote data
+      let yesVotes: number | null = null;
+      let noVotes: number | null = null;
+      let otherVotes: number | null = null;
+      let voteResult: string | null = null;
+
+      if (bill.votes && bill.votes.length > 0) {
+        // Find the most relevant vote (final passage or most recent)
+        const finalVote = bill.votes.find(v =>
+          v.motion_text?.toLowerCase().includes('final') ||
+          v.motion_text?.toLowerCase().includes('passage')
+        ) || bill.votes[bill.votes.length - 1];
+
+        if (finalVote && finalVote.counts) {
+          yesVotes = 0;
+          noVotes = 0;
+          otherVotes = 0;
+
+          for (const count of finalVote.counts) {
+            const option = count.option.toLowerCase();
+            if (option === 'yes' || option === 'yea' || option === 'aye') {
+              yesVotes = count.value;
+            } else if (option === 'no' || option === 'nay') {
+              noVotes = count.value;
+            } else {
+              otherVotes += count.value;
+            }
+          }
+
+          voteResult = finalVote.result || null;
+        }
+      }
 
       return {
         billId: bill.id,
@@ -282,6 +389,10 @@ export async function getMarylandBills(options: {
         })) || [],
         subjects: bill.subject || [],
         isLiveData: true,
+        yesVotes,
+        noVotes,
+        otherVotes,
+        voteResult,
       };
     });
 
@@ -290,7 +401,7 @@ export async function getMarylandBills(options: {
       billsCache = { data: bills, timestamp: Date.now() };
     }
 
-    console.log(`✅ Fetched ${bills.length} bills from OpenStates`);
+    console.log(`✅ Fetched ${bills.length} bills from OpenStates (with votes: ${bills.filter(b => b.yesVotes !== null).length})`);
     return bills;
   } catch (error) {
     console.error('Error fetching Maryland bills from OpenStates:', error);

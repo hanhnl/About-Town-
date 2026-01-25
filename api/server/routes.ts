@@ -14,6 +14,9 @@ import {
   requestFingerprintMiddleware,
   getBlockedIPCount
 } from "./bot-detection";
+import { cache, cacheKeys, cacheTTL, isRedisConfigured } from "./cache";
+import { getJurisdiction } from "./jurisdiction-service";
+import { clerkAuthMiddleware, requireAuth, authStatusHandler, isClerkConfigured, getClerkConfig, type AuthenticatedRequest } from "./auth";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format
@@ -131,13 +134,29 @@ export async function registerRoutes(
     }
   });
 
+  // Auth middleware for all routes (optional - doesn't require auth)
+  app.use('/api', clerkAuthMiddleware());
+
+  // Auth status endpoint
+  app.get('/api/auth/status', authStatusHandler());
+
+  // Auth config endpoint (for frontend)
+  app.get('/api/auth/config', (_req, res) => {
+    res.json(getClerkConfig());
+  });
+
   // Diagnostic endpoint - visit this to check if APIs are working
   app.get("/api/debug/status", async (_req, res) => {
     try {
+      const cacheStatus = cache.getStatus();
       const status = {
         databaseConfigured: isDatabaseConfigured(),
         legiScanConfigured: isLegiScanConfigured(),
         openStatesConfigured: isOpenStatesConfigured(),
+        clerkConfigured: isClerkConfigured(),
+        cacheType: cacheStatus.type,
+        cacheConfigured: cacheStatus.configured,
+        memoryCacheSize: cacheStatus.memorySize,
         environment: process.env.NODE_ENV || 'unknown',
         timestamp: new Date().toISOString(),
       };
@@ -194,24 +213,22 @@ export async function registerRoutes(
     const zipcode = req.query.zipcode as string | undefined;
     const usePagination = page > 0;
 
-    // Montgomery County zipcodes (all start with 208xx or 209xx in MD)
-    const MONTGOMERY_COUNTY_ZIPCODES = [
-      '20812', '20814', '20815', '20816', '20817', '20818', '20824', '20825',
-      '20827', '20832', '20833', '20837', '20838', '20839', '20841', '20842',
-      '20850', '20851', '20852', '20853', '20854', '20855', '20860', '20861',
-      '20862', '20866', '20868', '20871', '20872', '20874', '20875', '20876',
-      '20877', '20878', '20879', '20880', '20882', '20883', '20884', '20885',
-      '20886', '20889', '20891', '20892', '20894', '20895', '20896', '20897',
-      '20898', '20899', '20901', '20902', '20903', '20904', '20905', '20906',
-      '20907', '20908', '20910', '20911', '20912', '20913', '20914', '20915',
-      '20916', '20918', '20993', '20997',
-    ];
-
-    // Determine jurisdiction based on zipcode
-    const isMongtomeryCounty = zipcode && MONTGOMERY_COUNTY_ZIPCODES.includes(zipcode);
-    const jurisdiction = isMongtomeryCounty ? 'montgomery_county' : 'maryland_state';
+    // Use jurisdiction service for dynamic lookup (database-backed with fallback)
+    const jurisdictionInfo = zipcode ? await getJurisdiction(zipcode) : null;
+    const isMongtomeryCounty = jurisdictionInfo?.jurisdictionSlug === 'montgomery_county';
+    const jurisdiction = jurisdictionInfo?.jurisdictionSlug || 'maryland_state';
 
     console.log(`📍 /api/bills - Zipcode: ${zipcode || 'none'}, Jurisdiction: ${jurisdiction}`);
+
+    // Check cache first (only for non-search, non-paginated requests)
+    const cacheKey = cacheKeys.bills(zipcode);
+    if (!search && !usePagination) {
+      const cached = await cache.get<any>(cacheKey);
+      if (cached) {
+        console.log('📦 Returning cached bills response');
+        return res.json(cached);
+      }
+    }
 
     try {
       let allBills: any[] = [];
@@ -265,6 +282,7 @@ export async function registerRoutes(
 
           if (openStatesBills.length > 0) {
             // Convert OpenStates format to frontend format
+            // Use REAL vote counts from OpenStates API when available
             const formattedStateBills = openStatesBills.map((bill) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
@@ -273,8 +291,11 @@ export async function registerRoutes(
               status: bill.status,
               topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
               voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
-              supportVotes: Math.floor(Math.random() * 80) + 10,
-              opposeVotes: Math.floor(Math.random() * 30) + 5,
+              // Use real vote counts from OpenStates, fallback to estimates only if unavailable
+              supportVotes: bill.yesVotes ?? Math.floor(Math.random() * 80) + 10,
+              opposeVotes: bill.noVotes ?? Math.floor(Math.random() * 30) + 5,
+              hasRealVotes: bill.yesVotes !== null,
+              voteResult: bill.voteResult,
               sourceUrl: bill.url,
               isLiveData: true,
               lastAction: bill.lastAction,
@@ -300,6 +321,7 @@ export async function registerRoutes(
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
+            // LegiScan doesn't provide vote counts in list, so we use estimates
             const formattedStateBills = legiScanBills.map((bill) => ({
               id: bill.billId,
               billNumber: bill.billNumber,
@@ -308,8 +330,10 @@ export async function registerRoutes(
               status: mapLegiScanStatus(bill.status),
               topic: inferTopicFromSubjects(bill.subjects, bill.title, bill.description),
               voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
-              supportVotes: Math.floor(Math.random() * 80) + 10,
-              opposeVotes: Math.floor(Math.random() * 30) + 5,
+              // LegiScan doesn't include votes in list endpoint - would need individual bill fetch
+              supportVotes: 0,
+              opposeVotes: 0,
+              hasRealVotes: false,
               sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
               isLiveData: true,
               lastAction: bill.lastAction,
@@ -447,7 +471,7 @@ export async function registerRoutes(
       });
 
       // ===========================================
-      // RETURN RESPONSE
+      // RETURN RESPONSE (with caching)
       // ===========================================
       if (usePagination) {
         const startIndex = (page - 1) * limit;
@@ -466,12 +490,21 @@ export async function registerRoutes(
         });
       } else {
         const finalBills = filteredBills.slice(0, limit);
-        console.log(`📊 /api/bills - Returning ${finalBills.length} bills, jurisdiction: ${jurisdiction}`);
-        return res.json({
+        const response = {
           bills: finalBills,
           jurisdiction,
           sources,
-        });
+          cacheStatus: isRedisConfigured() ? 'redis' : 'memory',
+        };
+
+        // Cache the response for non-search queries
+        if (!search) {
+          await cache.set(cacheKey, response, cacheTTL.bills);
+          console.log(`💾 Cached bills response for ${zipcode || 'all'}`);
+        }
+
+        console.log(`📊 /api/bills - Returning ${finalBills.length} bills, jurisdiction: ${jurisdiction}`);
+        return res.json(response);
       }
     } catch (error) {
       console.error('❌ Error in /api/bills:', error);
