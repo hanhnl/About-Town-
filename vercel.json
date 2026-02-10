@@ -1,11 +1,11 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "npm run build:all",
   "outputDirectory": "dist/public",
   "installCommand": "npm install",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",
@@ -13,12 +13,7 @@
     }
   ],
   "functions": {
-    "api/index.ts": {
-      "memory": 1024,
-      "maxDuration": 10
-    },
-    "api/test.ts": {
-      "memory": 1024,
+    "api/index.js": {
       "maxDuration": 10
     }
   }
