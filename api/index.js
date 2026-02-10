@@ -40197,50 +40197,58 @@ async function makeLegiScanRequest(operation, params = {}) {
   if (!apiKey) {
     throw new Error("LEGISCAN_API_KEY not configured");
   }
-  const url = new URL(LEGISCAN_BASE_URL);
-  url.searchParams.set("key", apiKey);
-  url.searchParams.set("op", operation);
+  const queryParams = new URLSearchParams();
+  queryParams.set("key", apiKey);
+  queryParams.set("op", operation);
   for (const [key, value] of Object.entries(params)) {
-    url.searchParams.set(key, value);
+    queryParams.set(key, value);
   }
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15e3);
+  const url = `${LEGISCAN_BASE_URL}?${queryParams.toString()}`;
+  console.log(`[LegiScan] Making request: op=${operation}`);
   try {
-    const response = await fetch(url.toString(), {
-      headers: { "Accept": "application/json" },
-      signal: controller.signal
+    const response = await fetch(url, {
+      headers: { "Accept": "application/json" }
     });
-    clearTimeout(timeoutId);
     if (!response.ok) {
       throw new Error(`LegiScan API responded with status ${response.status}`);
     }
     const data = await response.json();
+    console.log(`[LegiScan] Response status: ${data.status}`);
     if (data.status === "ERROR") {
       throw new Error(`LegiScan API error: ${data.alert?.message || "Unknown error"}`);
     }
     return data;
   } catch (error) {
-    clearTimeout(timeoutId);
+    console.error(`[LegiScan] Request failed:`, error);
     throw error;
   }
 }
-var sessionsCache = null;
 var SESSIONS_CACHE_TTL = 24 * 60 * 60 * 1e3;
 var billsCache2 = null;
 var BILLS_CACHE_TTL = 15 * 60 * 1e3;
 async function getMarylandSessions() {
-  if (sessionsCache && Date.now() - sessionsCache.timestamp < SESSIONS_CACHE_TTL) {
-    return sessionsCache.data;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("[LegiScan] No API key configured");
+    return [];
   }
   try {
-    const response = await makeLegiScanRequest("getSessionList", { state: "MD" });
-    const sessionsObj = response.sessions || {};
-    const sessions = Object.values(sessionsObj).filter((s) => s && typeof s === "object" && s.session_id);
-    sessionsCache = { data: sessions, timestamp: Date.now() };
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=MD`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.status === "ERROR") {
+      console.error("[LegiScan] API error:", data.alert?.message);
+      return [];
+    }
+    const sessionsObj = data.sessions || {};
+    const sessions = Object.values(sessionsObj).filter((s) => {
+      return s && typeof s === "object" && s.session_id;
+    });
+    console.log("[LegiScan] Found", sessions.length, "sessions");
     return sessions;
   } catch (error) {
-    console.error("Error fetching Maryland sessions:", error);
-    return sessionsCache?.data || [];
+    console.error("[LegiScan] getMarylandSessions error:", error);
+    return [];
   }
 }
 async function getCurrentMarylandSession() {
@@ -40256,28 +40264,39 @@ async function getCurrentMarylandSession() {
 }
 async function getMarylandBills(options = {}) {
   const { limit = 50, search } = options;
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("[LegiScan] No API key for bills");
+    return [];
+  }
   try {
     let sessionId = options.sessionId;
     if (!sessionId) {
       const currentSession = await getCurrentMarylandSession();
       if (!currentSession) {
-        console.error("No Maryland session found");
+        console.error("[LegiScan] No Maryland session found");
         return [];
       }
       sessionId = currentSession.session_id;
+      console.log("[LegiScan] Using session:", sessionId);
     }
-    if (!search && billsCache2 && billsCache2.sessionId === sessionId && Date.now() - billsCache2.timestamp < BILLS_CACHE_TTL) {
-      return billsCache2.data.slice(0, limit);
-    }
-    const params = { id: String(sessionId) };
+    let url = `https://api.legiscan.com/?key=${apiKey}&op=getMasterList&id=${sessionId}`;
     if (search) {
-      params.query = search;
+      url = `https://api.legiscan.com/?key=${apiKey}&op=search&state=MD&query=${encodeURIComponent(search)}`;
     }
-    const response = await makeLegiScanRequest("getMasterList", params);
-    if (!response.masterlist) {
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.status === "ERROR") {
+      console.error("[LegiScan] Bills API error:", data.alert?.message);
       return [];
     }
-    const bills2 = Object.values(response.masterlist).filter((bill) => typeof bill === "object" && bill.bill_id).map((bill) => ({
+    const masterlist = data.masterlist || {};
+    if (Object.keys(masterlist).length === 0) {
+      console.log("[LegiScan] No bills in masterlist");
+      return [];
+    }
+    console.log("[LegiScan] Found", Object.keys(masterlist).length, "bills in masterlist");
+    const bills2 = Object.values(masterlist).filter((bill) => typeof bill === "object" && bill.bill_id).map((bill) => ({
       billId: bill.bill_id,
       billNumber: bill.number,
       title: bill.title,
@@ -40727,6 +40746,32 @@ async function registerRoutes(httpServer2, app2) {
         message: error instanceof Error ? error.message : String(error),
         timestamp: (/* @__PURE__ */ new Date()).toISOString()
       });
+    }
+  });
+  app2.get("/api/debug/legiscan", async (_req, res) => {
+    try {
+      const apiKey = process.env.LEGISCAN_API_KEY;
+      const rawResponse = await fetch(`https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=MD`);
+      const rawData = await rawResponse.json();
+      const sessions = await getMarylandSessions();
+      const currentSession = await getCurrentMarylandSession();
+      const bills2 = await getMarylandBills({ limit: 10 });
+      const firstSessionKey = rawData.sessions ? Object.keys(rawData.sessions)[0] : null;
+      const firstSession = firstSessionKey ? rawData.sessions[firstSessionKey] : null;
+      res.json({
+        configured: isLegiScanConfigured(),
+        apiKeyPresent: !!apiKey,
+        rawApiStatus: rawData.status,
+        rawSessionsKeys: rawData.sessions ? Object.keys(rawData.sessions).slice(0, 5) : [],
+        firstRawSession: firstSession,
+        sessionsCount: sessions.length,
+        sessions: sessions.slice(0, 5).map((s) => ({ id: s.session_id, name: s.name, years: `${s.year_start}-${s.year_end}` })),
+        currentSession: currentSession ? { id: currentSession.session_id, name: currentSession.name } : null,
+        billsCount: bills2.length,
+        sampleBills: bills2.slice(0, 3).map((b) => ({ id: b.billId, number: b.billNumber, title: b.title?.slice(0, 50) }))
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : void 0 });
     }
   });
   app2.get("/api/bills", async (req, res) => {

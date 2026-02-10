@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
+import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getCurrentMarylandSession } from "./legiscan-service";
 import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
 import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -94,6 +94,39 @@ export async function registerRoutes(
         message: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString()
       });
+    }
+  });
+
+  // Debug endpoint for LegiScan raw data
+  app.get("/api/debug/legiscan", async (_req, res) => {
+    try {
+      // Make raw API call to see what we get
+      const apiKey = process.env.LEGISCAN_API_KEY;
+      const rawResponse = await fetch(`https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=MD`);
+      const rawData = await rawResponse.json();
+      
+      const sessions = await getMarylandSessions();
+      const currentSession = await getCurrentMarylandSession();
+      const bills = await getLegiScanBills({ limit: 10 });
+      
+      // Get first raw session to see structure
+      const firstSessionKey = rawData.sessions ? Object.keys(rawData.sessions)[0] : null;
+      const firstSession = firstSessionKey ? rawData.sessions[firstSessionKey] : null;
+      
+      res.json({
+        configured: isLegiScanConfigured(),
+        apiKeyPresent: !!apiKey,
+        rawApiStatus: rawData.status,
+        rawSessionsKeys: rawData.sessions ? Object.keys(rawData.sessions).slice(0, 5) : [],
+        firstRawSession: firstSession,
+        sessionsCount: sessions.length,
+        sessions: sessions.slice(0, 5).map(s => ({ id: s.session_id, name: s.name, years: `${s.year_start}-${s.year_end}` })),
+        currentSession: currentSession ? { id: currentSession.session_id, name: currentSession.name } : null,
+        billsCount: bills.length,
+        sampleBills: bills.slice(0, 3).map(b => ({ id: b.billId, number: b.billNumber, title: b.title?.slice(0, 50) })),
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error), stack: error instanceof Error ? error.stack : undefined });
     }
   });
 
