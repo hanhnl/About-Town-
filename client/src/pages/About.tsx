@@ -22,6 +22,7 @@ export default function About() {
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
             About Town exists because we believe every citizen deserves to understand 
             the laws that shape their community - without paywalls, jargon, or complexity.
+            <strong className="text-primary"> Now covering all 50 US states.</strong>
           </p>
         </div>
       </section>
@@ -33,9 +34,13 @@ export default function About() {
           </h2>
           <div className="prose prose-lg max-w-none text-foreground">
             <p className="text-lg leading-relaxed mb-6">
-              Most local government websites are confusing, paywalled, or built for lobbyists.
-              <strong> About Town is different.</strong> Plain-language summaries, council voting records, 
-              neighbor discussions - all free.
+              Most government websites are confusing, paywalled, or built for lobbyists.
+              <strong> About Town is different.</strong> Plain-language summaries, voting records, 
+              neighbor discussions - all free, for every state.
+            </p>
+            <p className="text-lg leading-relaxed mb-6">
+              We track legislation across <strong>all 50 US states</strong> using real-time data from LegiScan. 
+              Just select your state and start following the bills that matter to you.
             </p>
           </div>
         </div>
