@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation as useWouterLocation } from "wouter";
-import { Menu, X, User, MapPin, Check, AlertCircle, UserPlus, LogOut, Star } from "lucide-react";
+import { Menu, X, User, MapPin, Check, AlertCircle, UserPlus, LogOut, Star, Crosshair, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "./ThemeToggle";
@@ -24,7 +24,7 @@ export function Header() {
   const { user, isLoggedIn, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useWouterLocation();
-  const { location: userLocation, setZipcode, isSupported, isLoading, hasJurisdiction } = useUserLocation();
+  const { location: userLocation, setZipcode, detectLocation, isSupported, isLoading, isDetecting, hasJurisdiction, locationError } = useUserLocation();
   const [zipcodeInput, setZipcodeInput] = useState(userLocation.zipcode);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -102,7 +102,30 @@ export function Header() {
                       Enter your ZIP code to see legislation that affects your area
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mb-2"
+                    onClick={detectLocation}
+                    disabled={isDetecting}
+                    data-testid="button-detect-location"
+                  >
+                    {isDetecting ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Crosshair className="h-4 w-4 mr-2" />
+                    )}
+                    {isDetecting ? "Detecting..." : "Use My Location"}
+                  </Button>
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-popover px-2 text-muted-foreground">or enter ZIP</span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-2">
                     <Input
                       placeholder="Enter ZIP code"
                       value={zipcodeInput}
@@ -120,6 +143,12 @@ export function Header() {
                       <Check className="h-4 w-4" />
                     </Button>
                   </div>
+                  {locationError && (
+                    <div className="flex items-start gap-2 text-xs text-red-600 dark:text-red-400">
+                      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                      <span>{locationError}</span>
+                    </div>
+                  )}
                   {isSupported && !hasJurisdiction && !isLoading && (
                     <div className="flex items-start gap-2 text-xs text-blue-600 dark:text-blue-400">
                       <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
@@ -128,11 +157,16 @@ export function Header() {
                       </span>
                     </div>
                   )}
-                  {userLocation.jurisdiction && (
+                  {(userLocation.state || userLocation.jurisdiction) && (
                     <div className="text-xs text-muted-foreground pt-1 border-t">
-                      <span className="font-medium">{userLocation.jurisdiction.name}</span>
-                      {userLocation.neighborhood && (
-                        <span> - {userLocation.neighborhood}</span>
+                      {userLocation.state && (
+                        <span className="font-medium">{userLocation.state}</span>
+                      )}
+                      {userLocation.jurisdiction && (
+                        <span className="font-medium">{userLocation.jurisdiction.name}</span>
+                      )}
+                      {userLocation.city && (
+                        <span> - {userLocation.city}</span>
                       )}
                     </div>
                   )}

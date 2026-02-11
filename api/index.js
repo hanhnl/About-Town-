@@ -40226,14 +40226,14 @@ async function makeLegiScanRequest(operation, params = {}) {
 var SESSIONS_CACHE_TTL = 24 * 60 * 60 * 1e3;
 var billsCache2 = null;
 var BILLS_CACHE_TTL = 15 * 60 * 1e3;
-async function getMarylandSessions() {
+async function getStateSessions(stateCode = "MD") {
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error("[LegiScan] No API key configured");
     return [];
   }
   try {
-    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=MD`;
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=${stateCode}`;
     const response = await fetch(url);
     const data = await response.json();
     if (data.status === "ERROR") {
@@ -40244,15 +40244,18 @@ async function getMarylandSessions() {
     const sessions = Object.values(sessionsObj).filter((s) => {
       return s && typeof s === "object" && s.session_id;
     });
-    console.log("[LegiScan] Found", sessions.length, "sessions");
+    console.log(`[LegiScan] Found ${sessions.length} sessions for ${stateCode}`);
     return sessions;
   } catch (error) {
-    console.error("[LegiScan] getMarylandSessions error:", error);
+    console.error("[LegiScan] getStateSessions error:", error);
     return [];
   }
 }
-async function getCurrentMarylandSession() {
-  const sessions = await getMarylandSessions();
+async function getMarylandSessions() {
+  return getStateSessions("MD");
+}
+async function getCurrentSession(stateCode = "MD") {
+  const sessions = await getStateSessions(stateCode);
   if (sessions.length === 0) return null;
   const regularSessions = sessions.filter((s) => s.special === 0);
   const targetSessions = regularSessions.length > 0 ? regularSessions : sessions;
@@ -40262,8 +40265,11 @@ async function getCurrentMarylandSession() {
     return latest;
   }, targetSessions[0]);
 }
-async function getMarylandBills(options = {}) {
-  const { limit = 50, search } = options;
+async function getCurrentMarylandSession() {
+  return getCurrentSession("MD");
+}
+async function getStateBills(options = {}) {
+  const { stateCode = "MD", limit = 50, search } = options;
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error("[LegiScan] No API key for bills");
@@ -40272,17 +40278,17 @@ async function getMarylandBills(options = {}) {
   try {
     let sessionId = options.sessionId;
     if (!sessionId) {
-      const currentSession = await getCurrentMarylandSession();
+      const currentSession = await getCurrentSession(stateCode);
       if (!currentSession) {
-        console.error("[LegiScan] No Maryland session found");
+        console.error(`[LegiScan] No session found for ${stateCode}`);
         return [];
       }
       sessionId = currentSession.session_id;
-      console.log("[LegiScan] Using session:", sessionId);
+      console.log(`[LegiScan] Using session ${sessionId} for ${stateCode}`);
     }
     let url = `https://api.legiscan.com/?key=${apiKey}&op=getMasterList&id=${sessionId}`;
     if (search) {
-      url = `https://api.legiscan.com/?key=${apiKey}&op=search&state=MD&query=${encodeURIComponent(search)}`;
+      url = `https://api.legiscan.com/?key=${apiKey}&op=search&state=${stateCode}&query=${encodeURIComponent(search)}`;
     }
     const response = await fetch(url);
     const data = await response.json();
@@ -40320,12 +40326,15 @@ async function getMarylandBills(options = {}) {
     }
     return bills2.slice(0, limit);
   } catch (error) {
-    console.error("Error fetching Maryland bills from LegiScan:", error);
+    console.error(`Error fetching bills from LegiScan:`, error);
     if (billsCache2) {
       return billsCache2.data.slice(0, limit);
     }
     return [];
   }
+}
+async function getMarylandBills(options = {}) {
+  return getStateBills({ ...options, stateCode: "MD" });
 }
 async function getBillDetail(billId) {
   const apiKey = getApiKey();
@@ -40420,18 +40429,19 @@ async function searchBills(query, state = "MD") {
     return [];
   }
 }
-async function getMarylandLegislators() {
+async function getStateLegislators(stateCode = "MD") {
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error("[LegiScan] No API key for legislators");
     return [];
   }
   try {
-    const currentSession = await getCurrentMarylandSession();
+    const currentSession = await getCurrentSession(stateCode);
     if (!currentSession) {
-      console.error("[LegiScan] No current session for legislators");
+      console.error(`[LegiScan] No current session for ${stateCode}`);
       return [];
     }
+    console.log(`[LegiScan] Fetching legislators for ${stateCode} session ${currentSession.session_id}`);
     const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionPeople&id=${currentSession.session_id}`;
     const response = await fetch(url);
     const data = await response.json();
@@ -40470,7 +40480,7 @@ async function getMarylandLegislators() {
     });
     return legislators;
   } catch (error) {
-    console.error("[LegiScan] getMarylandLegislators error:", error);
+    console.error("[LegiScan] getStateLegislators error:", error);
     return [];
   }
 }
@@ -40870,6 +40880,7 @@ async function registerRoutes(httpServer2, app2) {
     const search = req.query.search;
     const status = req.query.status;
     const topic = req.query.topic;
+    const state = req.query.state?.toUpperCase() || "MD";
     const usePagination = page > 0;
     try {
       if (isOpenStatesConfigured()) {
@@ -40920,8 +40931,8 @@ async function registerRoutes(httpServer2, app2) {
       }
       if (isLegiScanConfigured()) {
         try {
-          console.log("\u{1F504} Fetching bills from LegiScan API...");
-          const legiScanBills = await getMarylandBills({ limit: limit * (page || 1), search });
+          console.log(`\u{1F504} Fetching bills from LegiScan API for state: ${state}...`);
+          const legiScanBills = await getStateBills({ stateCode: state, limit: limit * (page || 1), search });
           if (legiScanBills.length > 0) {
             let bills2 = legiScanBills.map((bill) => ({
               id: bill.billId,
@@ -41192,10 +41203,11 @@ async function registerRoutes(httpServer2, app2) {
   });
   app2.get("/api/representatives", async (req, res) => {
     try {
-      const { district, chamber } = req.query;
+      const { district, chamber, state } = req.query;
+      const stateCode = state?.toUpperCase() || "MD";
       if (isLegiScanConfigured()) {
         try {
-          let legislators = await getMarylandLegislators();
+          let legislators = await getStateLegislators(stateCode);
           if (district) {
             legislators = legislators.filter(
               (l) => l.district.toLowerCase().includes(district.toLowerCase())
@@ -41207,19 +41219,75 @@ async function registerRoutes(httpServer2, app2) {
             );
           }
           if (legislators.length > 0) {
+            const stateNames = {
+              AL: "Alabama",
+              AK: "Alaska",
+              AZ: "Arizona",
+              AR: "Arkansas",
+              CA: "California",
+              CO: "Colorado",
+              CT: "Connecticut",
+              DE: "Delaware",
+              FL: "Florida",
+              GA: "Georgia",
+              HI: "Hawaii",
+              ID: "Idaho",
+              IL: "Illinois",
+              IN: "Indiana",
+              IA: "Iowa",
+              KS: "Kansas",
+              KY: "Kentucky",
+              LA: "Louisiana",
+              ME: "Maine",
+              MD: "Maryland",
+              MA: "Massachusetts",
+              MI: "Michigan",
+              MN: "Minnesota",
+              MS: "Mississippi",
+              MO: "Missouri",
+              MT: "Montana",
+              NE: "Nebraska",
+              NV: "Nevada",
+              NH: "New Hampshire",
+              NJ: "New Jersey",
+              NM: "New Mexico",
+              NY: "New York",
+              NC: "North Carolina",
+              ND: "North Dakota",
+              OH: "Ohio",
+              OK: "Oklahoma",
+              OR: "Oregon",
+              PA: "Pennsylvania",
+              RI: "Rhode Island",
+              SC: "South Carolina",
+              SD: "South Dakota",
+              TN: "Tennessee",
+              TX: "Texas",
+              UT: "Utah",
+              VT: "Vermont",
+              VA: "Virginia",
+              WA: "Washington",
+              WV: "West Virginia",
+              WI: "Wisconsin",
+              WY: "Wyoming",
+              DC: "District of Columbia",
+              PR: "Puerto Rico"
+            };
+            const stateName = stateNames[stateCode] || stateCode;
             const reps = legislators.map((leg, index) => ({
               id: leg.personId || index + 1,
               name: leg.name,
               initials: `${leg.firstName?.[0] || ""}${leg.lastName?.[0] || ""}`.toUpperCase() || leg.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase(),
               party: leg.party === "D" ? "Democrat" : leg.party === "R" ? "Republican" : leg.party,
-              district: `MD ${leg.chamber} District ${leg.district}`,
+              district: `${stateCode} ${leg.chamber} District ${leg.district}`,
               chamber: leg.chamber,
+              state: stateCode,
+              stateName,
               termEnd: "2027",
-              // Maryland legislators serve 4-year terms
               email: leg.email || null,
               phone: leg.phone || null,
               website: leg.website || null,
-              bio: `Maryland ${leg.role} representing District ${leg.district} in the ${leg.chamber === "Senate" ? "Maryland State Senate" : "Maryland House of Delegates"}.`,
+              bio: `${stateName} ${leg.role} representing District ${leg.district} in the ${stateName} State ${leg.chamber}.`,
               photoUrl: leg.photoUrl || null,
               isLiveData: true
             }));

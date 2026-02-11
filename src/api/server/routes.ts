@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getCurrentMarylandSession, getMarylandLegislators } from "./legiscan-service";
+import { getMarylandBills as getLegiScanBills, getStateBills, getMarylandSessions, getStateSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getCurrentMarylandSession, getCurrentSession, getMarylandLegislators, getStateLegislators } from "./legiscan-service";
 import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
 import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -163,6 +163,7 @@ export async function registerRoutes(
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const topic = req.query.topic as string | undefined;
+    const state = (req.query.state as string)?.toUpperCase() || 'MD';
     const usePagination = page > 0;
 
     try {
@@ -224,8 +225,8 @@ export async function registerRoutes(
       // Fallback to LegiScan API
       if (isLegiScanConfigured()) {
         try {
-          console.log('🔄 Fetching bills from LegiScan API...');
-          const legiScanBills = await getLegiScanBills({ limit: limit * (page || 1), search });
+          console.log(`🔄 Fetching bills from LegiScan API for state: ${state}...`);
+          const legiScanBills = await getStateBills({ stateCode: state, limit: limit * (page || 1), search });
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
@@ -527,12 +528,13 @@ export async function registerRoutes(
 
   app.get("/api/representatives", async (req, res) => {
     try {
-      const { district, chamber } = req.query;
+      const { district, chamber, state } = req.query;
+      const stateCode = (state as string)?.toUpperCase() || 'MD';
       
       // Try to get real legislators from LegiScan
       if (isLegiScanConfigured()) {
         try {
-          let legislators = await getMarylandLegislators();
+          let legislators = await getStateLegislators(stateCode);
           
           // Filter by district if provided
           if (district) {
@@ -550,18 +552,36 @@ export async function registerRoutes(
           
           if (legislators.length > 0) {
             // Map to the expected format for the frontend
+            // State name lookup
+            const stateNames: Record<string, string> = {
+              AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California",
+              CO: "Colorado", CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia",
+              HI: "Hawaii", ID: "Idaho", IL: "Illinois", IN: "Indiana", IA: "Iowa",
+              KS: "Kansas", KY: "Kentucky", LA: "Louisiana", ME: "Maine", MD: "Maryland",
+              MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi", MO: "Missouri",
+              MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+              NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio",
+              OK: "Oklahoma", OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina",
+              SD: "South Dakota", TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont",
+              VA: "Virginia", WA: "Washington", WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming",
+              DC: "District of Columbia", PR: "Puerto Rico"
+            };
+            const stateName = stateNames[stateCode] || stateCode;
+            
             const reps = legislators.map((leg, index) => ({
               id: leg.personId || index + 1,
               name: leg.name,
               initials: `${leg.firstName?.[0] || ''}${leg.lastName?.[0] || ''}`.toUpperCase() || leg.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
               party: leg.party === 'D' ? 'Democrat' : leg.party === 'R' ? 'Republican' : leg.party,
-              district: `MD ${leg.chamber} District ${leg.district}`,
+              district: `${stateCode} ${leg.chamber} District ${leg.district}`,
               chamber: leg.chamber,
-              termEnd: '2027', // Maryland legislators serve 4-year terms
+              state: stateCode,
+              stateName: stateName,
+              termEnd: '2027',
               email: leg.email || null,
               phone: leg.phone || null,
               website: leg.website || null,
-              bio: `Maryland ${leg.role} representing District ${leg.district} in the ${leg.chamber === 'Senate' ? 'Maryland State Senate' : 'Maryland House of Delegates'}.`,
+              bio: `${stateName} ${leg.role} representing District ${leg.district} in the ${stateName} State ${leg.chamber}.`,
               photoUrl: leg.photoUrl || null,
               isLiveData: true,
             }));

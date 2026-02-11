@@ -218,7 +218,7 @@ export interface NormalizedBillDetail {
   isLiveData: boolean;
 }
 
-export async function getMarylandSessions(): Promise<LegiScanSession[]> {
+export async function getStateSessions(stateCode: string = 'MD'): Promise<LegiScanSession[]> {
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error('[LegiScan] No API key configured');
@@ -226,8 +226,7 @@ export async function getMarylandSessions(): Promise<LegiScanSession[]> {
   }
   
   try {
-    // Use direct fetch to avoid any issues with makeLegiScanRequest
-    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=MD`;
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionList&state=${stateCode}`;
     const response = await fetch(url);
     const data = await response.json() as any;
     
@@ -242,20 +241,24 @@ export async function getMarylandSessions(): Promise<LegiScanSession[]> {
       return s && typeof s === 'object' && s.session_id;
     }) as LegiScanSession[];
     
-    console.log('[LegiScan] Found', sessions.length, 'sessions');
+    console.log(`[LegiScan] Found ${sessions.length} sessions for ${stateCode}`);
     return sessions;
   } catch (error) {
-    console.error('[LegiScan] getMarylandSessions error:', error);
+    console.error('[LegiScan] getStateSessions error:', error);
     return [];
   }
 }
 
-export async function getCurrentMarylandSession(): Promise<LegiScanSession | null> {
-  const sessions = await getMarylandSessions();
+// Backwards compatible alias
+export async function getMarylandSessions(): Promise<LegiScanSession[]> {
+  return getStateSessions('MD');
+}
+
+export async function getCurrentSession(stateCode: string = 'MD'): Promise<LegiScanSession | null> {
+  const sessions = await getStateSessions(stateCode);
   if (sessions.length === 0) return null;
   
   // Prefer regular sessions over special sessions, then by most recent year
-  // Special sessions (special=1) often have fewer bills
   const regularSessions = sessions.filter(s => s.special === 0);
   const targetSessions = regularSessions.length > 0 ? regularSessions : sessions;
   
@@ -267,12 +270,18 @@ export async function getCurrentMarylandSession(): Promise<LegiScanSession | nul
   }, targetSessions[0]);
 }
 
-export async function getMarylandBills(options: {
+// Backwards compatible alias
+export async function getCurrentMarylandSession(): Promise<LegiScanSession | null> {
+  return getCurrentSession('MD');
+}
+
+export async function getStateBills(options: {
+  stateCode?: string;
   sessionId?: number;
   limit?: number;
   search?: string;
 } = {}): Promise<LegiScanBillResult[]> {
-  const { limit = 50, search } = options;
+  const { stateCode = 'MD', limit = 50, search } = options;
   const apiKey = getApiKey();
   
   if (!apiKey) {
@@ -284,19 +293,19 @@ export async function getMarylandBills(options: {
     // Get current session if not specified
     let sessionId = options.sessionId;
     if (!sessionId) {
-      const currentSession = await getCurrentMarylandSession();
+      const currentSession = await getCurrentSession(stateCode);
       if (!currentSession) {
-        console.error('[LegiScan] No Maryland session found');
+        console.error(`[LegiScan] No session found for ${stateCode}`);
         return [];
       }
       sessionId = currentSession.session_id;
-      console.log('[LegiScan] Using session:', sessionId);
+      console.log(`[LegiScan] Using session ${sessionId} for ${stateCode}`);
     }
     
     // Build URL for direct fetch
     let url = `https://api.legiscan.com/?key=${apiKey}&op=getMasterList&id=${sessionId}`;
     if (search) {
-      url = `https://api.legiscan.com/?key=${apiKey}&op=search&state=MD&query=${encodeURIComponent(search)}`;
+      url = `https://api.legiscan.com/?key=${apiKey}&op=search&state=${stateCode}&query=${encodeURIComponent(search)}`;
     }
     
     const response = await fetch(url);
@@ -345,13 +354,22 @@ export async function getMarylandBills(options: {
     
     return bills.slice(0, limit);
   } catch (error) {
-    console.error('Error fetching Maryland bills from LegiScan:', error);
+    console.error(`Error fetching bills from LegiScan:`, error);
     // Return cached data if available
     if (billsCache) {
       return billsCache.data.slice(0, limit);
     }
     return [];
   }
+}
+
+// Backwards compatible alias
+export async function getMarylandBills(options: {
+  sessionId?: number;
+  limit?: number;
+  search?: string;
+} = {}): Promise<LegiScanBillResult[]> {
+  return getStateBills({ ...options, stateCode: 'MD' });
 }
 
 export async function getBillDetail(billId: number): Promise<NormalizedBillDetail | null> {
@@ -490,7 +508,7 @@ export interface MarylandLegislator {
   ballotpedia?: string;
 }
 
-export async function getMarylandLegislators(): Promise<MarylandLegislator[]> {
+export async function getStateLegislators(stateCode: string = 'MD'): Promise<MarylandLegislator[]> {
   const apiKey = getApiKey();
   if (!apiKey) {
     console.error('[LegiScan] No API key for legislators');
@@ -498,12 +516,13 @@ export async function getMarylandLegislators(): Promise<MarylandLegislator[]> {
   }
   
   try {
-    const currentSession = await getCurrentMarylandSession();
+    const currentSession = await getCurrentSession(stateCode);
     if (!currentSession) {
-      console.error('[LegiScan] No current session for legislators');
+      console.error(`[LegiScan] No current session for ${stateCode}`);
       return [];
     }
     
+    console.log(`[LegiScan] Fetching legislators for ${stateCode} session ${currentSession.session_id}`);
     const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionPeople&id=${currentSession.session_id}`;
     const response = await fetch(url);
     const data = await response.json() as any;
@@ -558,9 +577,14 @@ export async function getMarylandLegislators(): Promise<MarylandLegislator[]> {
     
     return legislators as MarylandLegislator[];
   } catch (error) {
-    console.error('[LegiScan] getMarylandLegislators error:', error);
+    console.error('[LegiScan] getStateLegislators error:', error);
     return [];
   }
+}
+
+// Backwards compatible alias
+export async function getMarylandLegislators(): Promise<MarylandLegislator[]> {
+  return getStateLegislators('MD');
 }
 
 // Test the API connection
