@@ -305,7 +305,8 @@ export async function registerRoutes(
               topic: inferTopicFromSubjects(legiScanBill.subjects, legiScanBill.title, legiScanBill.description),
               voteDate: legiScanBill.statusDate,
               sponsorName: legiScanBill.sponsors?.[0]?.name || null,
-              sourceUrl: legiScanBill.url,
+              sourceUrl: legiScanBill.url, // LegiScan URL
+              legislatureUrl: legiScanBill.legislatureUrl, // State legislature URL
               supportVotes: 0,
               opposeVotes: 0,
               state: legiScanBill.state,
