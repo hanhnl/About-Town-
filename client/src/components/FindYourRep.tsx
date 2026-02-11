@@ -4,86 +4,128 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import type { CouncilMember, CampaignContribution } from "@shared/schema";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, 
   MapPin, 
   Mail, 
   Phone, 
   ExternalLink,
-  ThumbsUp,
-  ThumbsDown,
-  Minus,
-  DollarSign,
-  Vote,
   ChevronDown,
   ChevronUp,
   Loader2,
-  AlertCircle
+  Building,
+  Landmark
 } from "lucide-react";
+
+interface Representative {
+  id: number;
+  name: string;
+  initials: string;
+  party: string;
+  district: string;
+  chamber?: string;
+  termEnd: string;
+  email: string | null;
+  phone: string | null;
+  website?: string | null;
+  bio: string;
+  photoUrl: string | null;
+  isLiveData?: boolean;
+}
 
 export function FindYourRep() {
   const [zipcode, setZipcode] = useState("20902");
-  const [showReps, setShowReps] = useState(true);
   const [expandedRep, setExpandedRep] = useState<number | null>(null);
+  const [chamberFilter, setChamberFilter] = useState<"all" | "Senate" | "House">("all");
 
-  const { data: representatives = [], isLoading } = useQuery<CouncilMember[]>({
+  const { data: representatives = [], isLoading } = useQuery<Representative[]>({
     queryKey: ["/api/representatives"],
   });
 
-  const { data: contributions = [] } = useQuery<CampaignContribution[]>({
-    queryKey: ["/api/representatives", expandedRep, "contributions"],
-    enabled: expandedRep !== null,
+  // Filter by chamber
+  const filteredReps = representatives.filter(rep => {
+    if (chamberFilter === "all") return true;
+    return rep.chamber === chamberFilter;
   });
+
+  // Count by chamber
+  const senateCount = representatives.filter(r => r.chamber === "Senate").length;
+  const houseCount = representatives.filter(r => r.chamber === "House").length;
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-xl">
-          <Users className="h-5 w-5 text-primary" />
-          Your Representatives
-        </CardTitle>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle className="flex items-center gap-2 text-xl">
+            <Users className="h-5 w-5 text-primary" />
+            Maryland State Legislators
+          </CardTitle>
+          {representatives.length > 0 && representatives[0]?.isLiveData && (
+            <Badge variant="outline" className="text-xs gap-1 bg-green-500/10 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700">
+              <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+              Live Data
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
-        <div className="flex gap-2 mb-6">
+        <div className="flex gap-2 mb-4">
           <div className="relative flex-1">
             <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Enter ZIP code..."
+              placeholder="Enter ZIP code to find your district..."
               value={zipcode}
               onChange={(e) => setZipcode(e.target.value)}
               className="pl-9"
               data-testid="input-rep-zipcode"
             />
           </div>
-          <Button 
-            onClick={() => setShowReps(true)}
-            data-testid="button-find-reps"
-          >
-            Find Reps
+          <Button data-testid="button-find-reps">
+            Find My Reps
           </Button>
         </div>
+
+        <Tabs defaultValue="all" className="mb-4" onValueChange={(v) => setChamberFilter(v as any)}>
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="all" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              All ({representatives.length})
+            </TabsTrigger>
+            <TabsTrigger value="Senate" className="flex items-center gap-2">
+              <Landmark className="h-4 w-4" />
+              Senate ({senateCount})
+            </TabsTrigger>
+            <TabsTrigger value="House" className="flex items-center gap-2">
+              <Building className="h-4 w-4" />
+              House ({houseCount})
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
 
         {isLoading && (
           <div className="text-center py-8">
             <Loader2 className="h-6 w-6 animate-spin text-primary mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Loading representatives...</p>
+            <p className="text-sm text-muted-foreground">Loading legislators...</p>
           </div>
         )}
 
-        {showReps && !isLoading && (
-          <div className="space-y-4">
-            {(representatives || []).map((rep) => (
+        {!isLoading && (
+          <div className="space-y-3 max-h-[600px] overflow-y-auto">
+            {filteredReps.map((rep) => (
               <div 
                 key={rep.id} 
-                className="border rounded-lg overflow-hidden"
+                className="border rounded-lg overflow-hidden hover:border-primary/50 transition-colors"
                 data-testid={`rep-card-${rep.id}`}
               >
                 <div className="p-4">
                   <div className="flex items-start gap-4">
-                    <Avatar className="h-14 w-14">
+                    <Avatar className="h-16 w-16 border-2 border-muted">
+                      {rep.photoUrl ? (
+                        <AvatarImage src={rep.photoUrl} alt={rep.name} className="object-cover" />
+                      ) : null}
                       <AvatarFallback className="text-lg bg-primary/10 text-primary">
                         {rep.initials}
                       </AvatarFallback>
@@ -91,10 +133,26 @@ export function FindYourRep() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="font-semibold text-foreground">{rep.name}</h3>
-                        <Badge variant="outline" className="text-xs">{rep.party}</Badge>
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs ${
+                            rep.party === 'Democrat' 
+                              ? 'bg-blue-500/10 text-blue-700 border-blue-300' 
+                              : rep.party === 'Republican'
+                              ? 'bg-red-500/10 text-red-700 border-red-300'
+                              : ''
+                          }`}
+                        >
+                          {rep.party === 'Democrat' ? 'D' : rep.party === 'Republican' ? 'R' : rep.party}
+                        </Badge>
+                        <Badge variant="secondary" className="text-xs">
+                          {rep.chamber}
+                        </Badge>
                       </div>
-                      <p className="text-sm text-muted-foreground">Council Member - {rep.district}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Term ends: {rep.termEnd}</p>
+                      <p className="text-sm text-muted-foreground">{rep.district}</p>
+                      {rep.email && (
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{rep.email}</p>
+                      )}
                     </div>
                   </div>
 
@@ -111,20 +169,22 @@ export function FindYourRep() {
                       <Button variant="outline" size="sm" asChild>
                         <a href={`tel:${rep.phone}`} data-testid={`button-phone-${rep.id}`}>
                           <Phone className="h-4 w-4 mr-1" />
-                          Call
+                          {rep.phone}
                         </a>
                       </Button>
                     )}
-                    <Button variant="outline" size="sm" asChild>
-                      <a 
-                        href={`https://www.montgomerycountymd.gov/council/`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="h-4 w-4 mr-1" />
-                        Website
-                      </a>
-                    </Button>
+                    {rep.website && (
+                      <Button variant="outline" size="sm" asChild>
+                        <a 
+                          href={rep.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="h-4 w-4 mr-1" />
+                          Official Bio
+                        </a>
+                      </Button>
+                    )}
                     <Button 
                       variant="ghost" 
                       size="sm"
@@ -132,9 +192,9 @@ export function FindYourRep() {
                       data-testid={`button-expand-${rep.id}`}
                     >
                       {expandedRep === rep.id ? (
-                        <>Less Info <ChevronUp className="h-4 w-4 ml-1" /></>
+                        <>Less <ChevronUp className="h-4 w-4 ml-1" /></>
                       ) : (
-                        <>More Info <ChevronDown className="h-4 w-4 ml-1" /></>
+                        <>More <ChevronDown className="h-4 w-4 ml-1" /></>
                       )}
                     </Button>
                   </div>
@@ -151,47 +211,19 @@ export function FindYourRep() {
 
                     <Separator />
 
-                    <div>
-                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-                          <DollarSign className="h-4 w-4" style={{ color: "hsl(var(--sage))" }} />
-                          Campaign Contributions (2022 Cycle)
-                        </h4>
-                        <Badge variant="outline" className="text-xs gap-1 bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 border-yellow-300 dark:border-yellow-700">
-                          <AlertCircle className="h-3 w-3" />
-                          Sample Data
-                        </Badge>
-                      </div>
-                      <div className="space-y-2">
-                        {contributions
-                          .filter(c => c.councilMemberId === rep.id)
-                          .map((contribution, i) => (
-                            <div 
-                              key={i} 
-                              className="flex items-center justify-between text-sm"
-                              data-testid={`contribution-${rep.id}-${i}`}
-                            >
-                              <span className="text-muted-foreground">{contribution.donorCategory}</span>
-                              <span className="font-medium text-foreground">
-                                ${contribution.amount.toLocaleString()}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                      <div className="mt-3 p-2 bg-muted/50 rounded text-xs text-muted-foreground">
-                        <p className="mb-2">
-                          This is illustrative sample data. For real campaign finance records, visit the official Maryland database:
-                        </p>
-                        <a 
-                          href="https://campaignfinance.maryland.gov/public/cf/contribution"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-primary hover:underline"
-                        >
-                          <ExternalLink className="h-3 w-3" />
-                          View Real Data on MDCRIS (2.4M+ records)
-                        </a>
-                      </div>
+                    <div className="text-xs text-muted-foreground">
+                      <p className="mb-2">
+                        For campaign finance records, visit the official Maryland database:
+                      </p>
+                      <a 
+                        href="https://campaignfinance.maryland.gov/public/cf/contribution"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" />
+                        View on MDCRIS
+                      </a>
                     </div>
                   </div>
                 )}
@@ -199,6 +231,10 @@ export function FindYourRep() {
             ))}
           </div>
         )}
+
+        <p className="text-xs text-muted-foreground mt-4 text-center">
+          Data from Maryland General Assembly via LegiScan • 2026 Regular Session
+        </p>
       </CardContent>
     </Card>
   );
