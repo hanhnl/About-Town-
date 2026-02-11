@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { SEO, SEO_PAGES } from "@/components/SEO";
 import { FindYourRep } from "@/components/FindYourRep";
+import { useUserLocation } from "@/contexts/LocationContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,9 @@ const mockCampaignAnalysis: CampaignDonor[] = [
 
 export default function Representatives() {
   const [showFundingAnalysis, setShowFundingAnalysis] = useState(false);
+  const { location: userLocation } = useUserLocation();
+  const stateName = userLocation.state || 'your state';
+  const stateCode = userLocation.stateCode || 'MD';
 
   return (
     <>
@@ -51,10 +55,10 @@ export default function Representatives() {
         
         <div className="mb-8">
           <h1 className="text-3xl md:text-4xl font-semibold text-foreground mb-4">
-            Your Representatives
+            Your {stateName} Representatives
           </h1>
           <p className="text-xl text-muted-foreground">
-            Find who represents you based on your ZIP code, see how they vote, and follow the money.
+            Find who represents you in the {stateName} Legislature, see how they vote, and follow the money.
           </p>
         </div>
 
@@ -153,17 +157,17 @@ export default function Representatives() {
                 
                 <div className="mt-6 p-3 bg-muted/50 rounded-md">
                   <p className="text-xs text-muted-foreground mb-2">
-                    This is sample data for demonstration. For real campaign finance records:
+                    This is sample data for demonstration. For real campaign finance records, visit your state's election board or{' '}
+                    <a 
+                      href="https://www.followthemoney.org/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-primary hover:underline"
+                    >
+                      FollowTheMoney.org
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </p>
-                  <a 
-                    href="https://campaignfinance.maryland.gov/public/cf/contribution"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <ExternalLink className="h-3 w-3" />
-                    View Real Data on MDCRIS (2.4M+ records)
-                  </a>
                 </div>
               </div>
             )}
@@ -185,7 +189,8 @@ export default function Representatives() {
           <DataTransparency 
             sources={[
               ...defaultDataSources,
-              { name: "MD State Board of Elections", url: "https://elections.maryland.gov/" }
+              { name: "FollowTheMoney.org", url: "https://www.followthemoney.org/" },
+              { name: "OpenSecrets", url: "https://www.opensecrets.org/" }
             ]}
             lastUpdated="2 hours ago"
           />
