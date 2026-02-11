@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { SEO, SEO_PAGES } from "@/components/SEO";
 import { StatsCard } from "@/components/StatsCard";
 import { FilterBar } from "@/components/FilterBar";
 import { BillCard, type Bill as BillCardType } from "@/components/BillCard";
@@ -99,7 +100,9 @@ export default function Dashboard() {
   const hasLiveData = (bills || []).some((bill: any) => bill.isLiveData);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO {...SEO_PAGES.dashboard} />
+      <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="flex items-center gap-3 mb-3">
@@ -168,5 +171,6 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
+    </>
   );
 }

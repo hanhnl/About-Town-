@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SEO, SEO_PAGES } from "@/components/SEO";
 import { FindYourRep } from "@/components/FindYourRep";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,9 @@ export default function Representatives() {
   const [showFundingAnalysis, setShowFundingAnalysis] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO {...SEO_PAGES.representatives} />
+      <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Breadcrumbs items={[{ label: "Your Representatives" }]} />
         
@@ -189,5 +192,6 @@ export default function Representatives() {
         </div>
       </div>
     </div>
+    </>
   );
 }

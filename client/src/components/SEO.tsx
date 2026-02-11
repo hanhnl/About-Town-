@@ -1,0 +1,170 @@
+import { useEffect } from 'react';
+
+interface SEOProps {
+  title?: string;
+  description?: string;
+  keywords?: string;
+  image?: string;
+  url?: string;
+  type?: 'website' | 'article';
+  noindex?: boolean;
+  // For bill/legislation specific pages
+  billId?: string;
+  billTitle?: string;
+  legislationType?: string;
+}
+
+const BASE_URL = 'https://abouttown.app';
+const DEFAULT_TITLE = 'About Town - Track Local Legislation | California Bills Made Simple';
+const DEFAULT_DESCRIPTION = 'Track California legislation affecting your community. About Town simplifies bills, explains their impact, and helps citizens engage with local government.';
+const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`;
+
+export function SEO({
+  title,
+  description = DEFAULT_DESCRIPTION,
+  keywords,
+  image = DEFAULT_IMAGE,
+  url,
+  type = 'website',
+  noindex = false,
+  billId,
+  billTitle,
+  legislationType,
+}: SEOProps) {
+  const fullTitle = title ? `${title} | About Town` : DEFAULT_TITLE;
+  const fullUrl = url ? `${BASE_URL}${url}` : BASE_URL;
+  const fullImage = image.startsWith('http') ? image : `${BASE_URL}${image}`;
+
+  useEffect(() => {
+    // Update document title
+    document.title = fullTitle;
+
+    // Helper to update/create meta tags
+    const setMeta = (name: string, content: string, isProperty = false) => {
+      const attr = isProperty ? 'property' : 'name';
+      let element = document.querySelector(`meta[${attr}="${name}"]`) as HTMLMetaElement;
+      if (!element) {
+        element = document.createElement('meta');
+        element.setAttribute(attr, name);
+        document.head.appendChild(element);
+      }
+      element.setAttribute('content', content);
+    };
+
+    // Basic meta
+    setMeta('description', description);
+    setMeta('robots', noindex ? 'noindex, nofollow' : 'index, follow');
+    if (keywords) {
+      setMeta('keywords', keywords);
+    }
+
+    // Open Graph
+    setMeta('og:title', fullTitle, true);
+    setMeta('og:description', description, true);
+    setMeta('og:image', fullImage, true);
+    setMeta('og:url', fullUrl, true);
+    setMeta('og:type', type, true);
+
+    // Twitter
+    setMeta('twitter:title', fullTitle);
+    setMeta('twitter:description', description);
+    setMeta('twitter:image', fullImage);
+    setMeta('twitter:url', fullUrl);
+
+    // Update canonical link
+    let canonical = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
+    if (!canonical) {
+      canonical = document.createElement('link');
+      canonical.setAttribute('rel', 'canonical');
+      document.head.appendChild(canonical);
+    }
+    canonical.setAttribute('href', fullUrl);
+
+    // Add JSON-LD for bill pages
+    if (billId && billTitle) {
+      const existingScript = document.querySelector('script[data-seo-bill]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.setAttribute('data-seo-bill', 'true');
+      script.textContent = JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'Legislation',
+        name: billTitle,
+        identifier: billId,
+        legislationType: legislationType || 'Bill',
+        legislationJurisdiction: {
+          '@type': 'AdministrativeArea',
+          name: 'California',
+          addressCountry: 'US',
+        },
+        url: fullUrl,
+        isPartOf: {
+          '@type': 'WebSite',
+          name: 'About Town',
+          url: BASE_URL,
+        },
+      });
+      document.head.appendChild(script);
+    }
+
+    // Cleanup function
+    return () => {
+      const billScript = document.querySelector('script[data-seo-bill]');
+      if (billScript) {
+        billScript.remove();
+      }
+    };
+  }, [fullTitle, description, fullImage, fullUrl, type, noindex, keywords, billId, billTitle, legislationType]);
+
+  return null;
+}
+
+// Pre-defined SEO configs for each page
+export const SEO_PAGES = {
+  home: {
+    title: undefined, // Uses default
+    description: 'Track California legislation affecting your community. About Town simplifies bills, explains their impact, and helps citizens engage with local government. Free, no jargon.',
+    keywords: 'California legislation, local bills, civic engagement, track legislation, California Assembly bills, California Senate bills',
+    url: '/',
+  },
+  dashboard: {
+    title: 'Track Bills',
+    description: 'View and track California bills in real-time. Filter by topic, status, and location. Get AI-powered summaries and understand how legislation affects your community.',
+    keywords: 'track California bills, legislation tracker, bill status, California Assembly, California Senate, bill updates',
+    url: '/dashboard',
+  },
+  issues: {
+    title: 'Browse Issues',
+    description: 'Explore California legislation by topic. From housing to healthcare, education to environment - find bills that matter to you and your community.',
+    keywords: 'California issues, legislation topics, housing bills, healthcare legislation, education bills, environmental policy California',
+    url: '/issues',
+  },
+  representatives: {
+    title: 'Find Your Representatives',
+    description: 'Find your California state representatives. See their voting records, sponsored bills, and contact information. Connect with your elected officials.',
+    keywords: 'California representatives, state assembly member, state senator, find my representative, elected officials California, voting records',
+    url: '/representatives',
+  },
+  about: {
+    title: 'About Us',
+    description: 'About Town is a free, non-partisan civic engagement platform. We make California legislation accessible to everyone. By the people, for the people.',
+    keywords: 'about About Town, civic engagement, government transparency, legislation access, civic tech',
+    url: '/about',
+  },
+  signup: {
+    title: 'Sign Up',
+    description: 'Join About Town to track bills, get personalized updates, and engage with your community. Free forever, no paywall.',
+    keywords: 'sign up About Town, create account, legislation alerts, bill notifications',
+    url: '/signup',
+  },
+  profile: {
+    title: 'My Profile',
+    description: 'Manage your About Town profile, tracked bills, and notification preferences.',
+    url: '/profile',
+    noindex: true, // Don't index user profile pages
+  },
+} as const;

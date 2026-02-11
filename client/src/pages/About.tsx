@@ -1,4 +1,5 @@
 import { Link } from "wouter";
+import { SEO, SEO_PAGES } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Users, Eye, DollarSign, Heart, Shield, Accessibility, Database, Sparkles, FileText, ExternalLink } from "lucide-react";
@@ -6,7 +7,9 @@ import { NeighborhoodGridLogo } from "@/components/NeighborhoodGridLogo";
 
 export default function About() {
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO {...SEO_PAGES.about} />
+      <div className="min-h-screen bg-background">
       <section className="py-16 md:py-24 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto text-center">
           <NeighborhoodGridLogo size={80} className="mx-auto mb-6" />
@@ -313,5 +316,6 @@ export default function About() {
         </div>
       </section>
     </div>
+    </>
   );
 }

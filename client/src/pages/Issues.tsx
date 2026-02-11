@@ -1,3 +1,4 @@
+import { SEO, SEO_PAGES } from "@/components/SEO";
 import { IssueCategoryCard } from "@/components/IssueCategoryCard";
 import type { Topic } from "@/components/TopicBadge";
 
@@ -55,7 +56,9 @@ export default function Issues() {
   const categoriesWithoutBills = issueCategories.filter((c) => c.billCount === 0);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO {...SEO_PAGES.issues} />
+      <div className="min-h-screen bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-semibold text-foreground mb-2" data-testid="text-page-title">
@@ -103,5 +106,6 @@ export default function Issues() {
         )}
       </div>
     </div>
+    </>
   );
 }

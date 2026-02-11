@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useUserLocation } from "@/contexts/LocationContext";
+import { SEO, SEO_PAGES } from "@/components/SEO";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -148,7 +149,9 @@ export default function Landing() {
   const hasLiveData = displayedBills.some(bill => bill.isLiveData);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO {...SEO_PAGES.home} />
+      <div className="min-h-screen bg-background">
       {/* Hero Section with Address Search */}
       <section className="py-16 md:py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-primary/10 via-primary/5 to-background animate-in fade-in slide-in-from-top-4 duration-700">
         <div className="max-w-4xl mx-auto text-center">
@@ -551,5 +554,6 @@ export default function Landing() {
         </div>
       </footer>
     </div>
+    </>
   );
 }

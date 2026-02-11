@@ -3,6 +3,7 @@ import { useParams, Link, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { ArrowLeft, Calendar, ExternalLink, Globe, User, Loader2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { SEO } from "@/components/SEO";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -229,7 +230,17 @@ export default function BillDetail() {
   const displayStatus = mapStatusToBillStatus(bill.status);
 
   return (
-    <div className="min-h-screen bg-background">
+    <>
+      <SEO
+        title={`${bill.billNumber}: ${bill.title}`}
+        description={bill.summary || `Track ${bill.billNumber} - ${bill.title}. See status, sponsors, timeline, and community sentiment on About Town.`}
+        keywords={`${bill.billNumber}, California bill, ${bill.topic}, legislation, ${bill.title}`}
+        url={`/bill/${bill.id}`}
+        billId={bill.billNumber}
+        billTitle={bill.title}
+        legislationType="Bill"
+      />
+      <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Breadcrumbs 
           items={[
@@ -447,5 +458,6 @@ export default function BillDetail() {
         )}
       </div>
     </div>
+    </>
   );
 }
