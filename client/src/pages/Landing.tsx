@@ -90,20 +90,28 @@ export default function Landing() {
     queryKey: ["/api/stats"],
   });
 
-  // Dynamic location text based on user's ZIP code
+  // Dynamic location text based on user's state
   const locationText = useMemo(() => {
+    if (userLocation.state) {
+      return userLocation.state;
+    }
     if (userLocation.city) {
       return userLocation.city;
     }
-    if (userLocation.neighborhood) {
-      return userLocation.neighborhood;
-    }
-    return "Maryland";
+    return "your state";
   }, [userLocation]);
 
-  // Fetch bills from unified API endpoint
+  const stateCode = userLocation.stateCode || 'MD';
+  const stateName = userLocation.state || 'your state';
+
+  // Fetch bills from unified API endpoint with state
   const { data: allBills = [], isLoading: billsLoading } = useQuery<any[]>({
-    queryKey: ["/api/bills"],
+    queryKey: ["/api/bills", { state: stateCode }],
+    queryFn: async () => {
+      const response = await fetch(`/api/bills?state=${stateCode}&limit=10`);
+      if (!response.ok) throw new Error('Failed to fetch bills');
+      return response.json();
+    },
     retry: 1,
   });
 
@@ -121,7 +129,7 @@ export default function Landing() {
       // Try to fetch zipcode data (best effort)
       fetch(`/api/zipcodes/lookup/${zipcode}`).catch(() => {});
 
-      // Always navigate to dashboard - we support all Maryland zip codes
+      // Always navigate to dashboard - we support all US zip codes
       setLocation("/dashboard");
     } catch {
       // Even on error, navigate to dashboard
@@ -161,13 +169,13 @@ export default function Landing() {
           </div>
           
           <p className="text-xl text-primary font-medium mb-4">
-            Track Maryland state legislation that impacts your community
+            Track state legislation across all 50 US states
           </p>
           <p className="text-2xl md:text-3xl text-foreground mb-4 font-medium">
             What's happening in {locationText}?
           </p>
           <p className="text-lg text-muted-foreground mb-10 max-w-2xl mx-auto">
-            Real-time access to Maryland House and Senate bills.
+            Real-time access to state legislature bills in all 50 states.
             Plain language summaries. No jargon. No paywall.
           </p>
 
@@ -178,7 +186,7 @@ export default function Landing() {
                 <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder="Enter your Maryland ZIP code"
+                  placeholder="Enter your ZIP code"
                   value={zipcode}
                   onChange={(e) => {
                     setZipcode(e.target.value);
@@ -227,9 +235,9 @@ export default function Landing() {
               </div>
               <div data-testid="stat-neighborhoods">
                 <p className="text-3xl md:text-4xl font-bold text-foreground">
-                  {stats.neighborhoodsActive}
+                  50
                 </p>
-                <p className="text-sm text-muted-foreground">neighborhoods covered</p>
+                <p className="text-sm text-muted-foreground">states covered</p>
               </div>
             </div>
           )}
