@@ -1,7 +1,78 @@
-// LegiScan API Integration for Maryland State Legislature
+// LegiScan API Integration - Nationwide State Legislature Support
 // Documentation: https://legiscan.com/legiscan
 
 const LEGISCAN_BASE_URL = 'https://api.legiscan.com/';
+
+// State legislature URLs for bill details
+const STATE_LEGISLATURE_URLS: Record<string, string> = {
+  AL: 'http://alisondb.legislature.state.al.us/alison/CodeOfAlabama/1975/coatoc.htm',
+  AK: 'https://www.akleg.gov/basis/Bill/Detail/',
+  AZ: 'https://www.azleg.gov/legtext/',
+  AR: 'https://www.arkleg.state.ar.us/Bills/Detail?id=',
+  CA: 'https://leginfo.legislature.ca.gov/faces/billNavClient.xhtml?bill_id=',
+  CO: 'https://leg.colorado.gov/bills/',
+  CT: 'https://www.cga.ct.gov/asp/cgabillstatus/cgabillstatus.asp?selBillType=Bill&bill_num=',
+  DE: 'https://legis.delaware.gov/BillDetail?LegislationId=',
+  FL: 'https://www.flsenate.gov/Session/Bill/',
+  GA: 'https://www.legis.ga.gov/legislation/',
+  HI: 'https://www.capitol.hawaii.gov/measure_indiv.aspx?billtype=',
+  ID: 'https://legislature.idaho.gov/sessioninfo/billbookmark/?yr=',
+  IL: 'https://www.ilga.gov/legislation/billstatus.asp?DocNum=',
+  IN: 'https://iga.in.gov/legislative/laws/2024/bills/',
+  IA: 'https://www.legis.iowa.gov/legislation/BillBook?ga=',
+  KS: 'http://www.kslegislature.org/li/b2023_24/measures/',
+  KY: 'https://apps.legislature.ky.gov/record/',
+  LA: 'https://www.legis.la.gov/legis/BillInfo.aspx?s=',
+  ME: 'http://legislature.maine.gov/LawMakerWeb/summary.asp?ID=',
+  MD: 'https://mgaleg.maryland.gov/mgawebsite/Legislation/Details/',
+  MA: 'https://malegislature.gov/Bills/',
+  MI: 'http://www.legislature.mi.gov/documents/',
+  MN: 'https://www.revisor.mn.gov/bills/bill.php?b=',
+  MS: 'http://billstatus.ls.state.ms.us/documents/2024/',
+  MO: 'https://www.senate.mo.gov/24info/BTS_Web/Bill.aspx?SessionType=R&BillID=',
+  MT: 'https://leg.mt.gov/bills/',
+  NE: 'https://nebraskalegislature.gov/bills/view_bill.php?DocumentID=',
+  NV: 'https://www.leg.state.nv.us/App/NELIS/REL/',
+  NH: 'http://www.gencourt.state.nh.us/bill_status/bill_status.aspx?lsr=',
+  NJ: 'https://www.njleg.state.nj.us/bill-search/',
+  NM: 'https://www.nmlegis.gov/Legislation/Legislation?chamber=',
+  NY: 'https://www.nysenate.gov/legislation/bills/',
+  NC: 'https://www.ncleg.gov/BillLookUp/',
+  ND: 'https://www.ndlegis.gov/assembly/',
+  OH: 'https://www.legislature.ohio.gov/legislation/',
+  OK: 'http://www.oklegislature.gov/BillInfo.aspx?Bill=',
+  OR: 'https://olis.oregonlegislature.gov/liz/',
+  PA: 'https://www.legis.state.pa.us/cfdocs/billinfo/billinfo.cfm?syession=',
+  RI: 'http://webserver.rilin.state.ri.us/BillText/',
+  SC: 'https://www.scstatehouse.gov/billsearch.php?billnumbers=',
+  SD: 'https://sdlegislature.gov/Session/Bill/',
+  TN: 'https://wapp.capitol.tn.gov/apps/BillInfo/Default.aspx?BillNumber=',
+  TX: 'https://capitol.texas.gov/BillLookup/History.aspx?LegSess=89R&Bill=',
+  UT: 'https://le.utah.gov/~2024/bills/static/',
+  VT: 'https://legislature.vermont.gov/bill/status/',
+  VA: 'https://lis.virginia.gov/cgi-bin/legp604.exe?',
+  WA: 'https://app.leg.wa.gov/billsummary?BillNumber=',
+  WV: 'https://www.wvlegislature.gov/Bill_Status/bills_history.cfm?input=',
+  WI: 'https://docs.legis.wisconsin.gov/',
+  WY: 'https://www.wyoleg.gov/Legislation/',
+  DC: 'https://lims.dccouncil.gov/Legislation/',
+  PR: 'https://sutra.oslpr.org/osl/',
+};
+
+// State name mapping
+const STATE_NAMES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California',
+  CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa',
+  KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland',
+  MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri',
+  MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey',
+  NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio',
+  OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
+  VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  DC: 'District of Columbia', PR: 'Puerto Rico'
+};
 
 interface LegiScanBill {
   bill_id: number;
@@ -100,6 +171,7 @@ export interface LegiScanBillResult {
   lastActionDate: string | null;
   url: string;
   state: string;
+  stateName: string;
   sponsors: Array<{
     name: string;
     party: string;
@@ -125,6 +197,17 @@ function getApiKey(): string | null {
 
 export function isLegiScanConfigured(): boolean {
   return !!process.env.LEGISCAN_API_KEY;
+}
+
+export function getStateName(stateCode: string): string {
+  return STATE_NAMES[stateCode.toUpperCase()] || stateCode;
+}
+
+export function getStateLegislatureUrl(stateCode: string, billNumber?: string): string {
+  const baseUrl = STATE_LEGISLATURE_URLS[stateCode.toUpperCase()];
+  if (!baseUrl) return 'https://legiscan.com';
+  if (billNumber) return `${baseUrl}${billNumber}`;
+  return baseUrl;
 }
 
 async function makeLegiScanRequest<T>(operation: string, params: Record<string, string> = {}): Promise<T> {
@@ -168,12 +251,12 @@ async function makeLegiScanRequest<T>(operation: string, params: Record<string, 
   }
 }
 
-// Cache for session list
-let sessionsCache: { data: LegiScanSession[]; timestamp: number } | null = null;
+// Per-state cache for sessions
+const sessionsCacheByState: Map<string, { data: LegiScanSession[]; timestamp: number }> = new Map();
 const SESSIONS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
 
-// Cache for bills - stores FULL list, sliced per request to avoid cache corruption
-let billsCache: { data: LegiScanBillResult[]; timestamp: number; sessionId: number } | null = null;
+// Per-state cache for bills
+const billsCacheByState: Map<string, { data: LegiScanBillResult[]; timestamp: number; sessionId: number }> = new Map();
 const BILLS_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 // Normalized bill detail response interface
@@ -184,6 +267,7 @@ export interface NormalizedBillDetail {
   title: string;
   description: string;
   state: string;
+  stateName: string;
   status: string;
   statusDate: string | null;
   history: Array<{
@@ -216,41 +300,49 @@ export interface NormalizedBillDetail {
   }>;
   subjects: string[];
   url: string;
+  legislatureUrl: string;
   isLiveData: boolean;
 }
 
-export async function getMarylandSessions(): Promise<LegiScanSession[]> {
-  if (sessionsCache && (Date.now() - sessionsCache.timestamp) < SESSIONS_CACHE_TTL) {
-    return sessionsCache.data;
+/**
+ * Get legislative sessions for any state
+ */
+export async function getStateSessions(stateCode: string = 'MD'): Promise<LegiScanSession[]> {
+  const state = stateCode.toUpperCase();
+  const cached = sessionsCacheByState.get(state);
+  
+  if (cached && (Date.now() - cached.timestamp) < SESSIONS_CACHE_TTL) {
+    return cached.data;
   }
   
   try {
     const response = await makeLegiScanRequest<{
       status: string;
       sessions: Record<string, LegiScanSession>;
-    }>('getSessionList', { state: 'MD' });
+    }>('getSessionList', { state });
     
-    // LegiScan returns sessions as an object with numeric keys, not an array
     const sessionsObj = response.sessions || {};
     const sessions = Object.values(sessionsObj).filter(s => s && typeof s === 'object' && s.session_id);
-    sessionsCache = { data: sessions, timestamp: Date.now() };
+    sessionsCacheByState.set(state, { data: sessions, timestamp: Date.now() });
     return sessions;
   } catch (error) {
-    console.error('Error fetching Maryland sessions:', error);
-    return sessionsCache?.data || [];
+    console.error(`Error fetching ${state} sessions:`, error);
+    return cached?.data || [];
   }
 }
 
-export async function getCurrentMarylandSession(): Promise<LegiScanSession | null> {
-  const sessions = await getMarylandSessions();
+/**
+ * Get current (most recent) legislative session for a state
+ */
+export async function getCurrentStateSession(stateCode: string = 'MD'): Promise<LegiScanSession | null> {
+  const sessions = await getStateSessions(stateCode);
   if (sessions.length === 0) return null;
   
-  // Prefer regular sessions over special sessions, then by most recent year
-  // Special sessions (special=1) often have fewer bills
+  // Prefer regular sessions over special sessions
   const regularSessions = sessions.filter(s => s.special === 0);
   const targetSessions = regularSessions.length > 0 ? regularSessions : sessions;
   
-  // Get the most recent session (highest year_end, then by session_id for tie-breaking)
+  // Get most recent session
   return targetSessions.reduce((latest, session) => {
     if (session.year_end > latest.year_end) return session;
     if (session.year_end === latest.year_end && session.session_id > latest.session_id) return session;
@@ -258,30 +350,35 @@ export async function getCurrentMarylandSession(): Promise<LegiScanSession | nul
   }, targetSessions[0]);
 }
 
-export async function getMarylandBills(options: {
+/**
+ * Get bills for any state - main nationwide function
+ */
+export async function getStateBills(options: {
+  state?: string;
   sessionId?: number;
   limit?: number;
   search?: string;
 } = {}): Promise<LegiScanBillResult[]> {
-  const { limit = 50, search } = options;
+  const { state = 'MD', limit = 50, search } = options;
+  const stateCode = state.toUpperCase();
   
   try {
     // Get current session if not specified
     let sessionId = options.sessionId;
     if (!sessionId) {
-      const currentSession = await getCurrentMarylandSession();
+      const currentSession = await getCurrentStateSession(stateCode);
       if (!currentSession) {
-        console.error('No Maryland session found');
+        console.error(`No session found for ${stateCode}`);
         return [];
       }
       sessionId = currentSession.session_id;
     }
     
-    // Check cache
-    if (!search && billsCache && 
-        billsCache.sessionId === sessionId && 
-        (Date.now() - billsCache.timestamp) < BILLS_CACHE_TTL) {
-      return billsCache.data.slice(0, limit);
+    // Check per-state cache
+    const cacheKey = `${stateCode}-${sessionId}`;
+    const cached = billsCacheByState.get(cacheKey);
+    if (!search && cached && (Date.now() - cached.timestamp) < BILLS_CACHE_TTL) {
+      return cached.data.slice(0, limit);
     }
     
     const params: Record<string, string> = { id: String(sessionId) };
@@ -310,7 +407,8 @@ export async function getMarylandBills(options: {
         lastAction: bill.last_action,
         lastActionDate: bill.last_action_date || null,
         url: bill.url,
-        state: 'MD',
+        state: stateCode,
+        stateName: getStateName(stateCode),
         sponsors: [],
         subjects: [],
         isLiveData: true,
@@ -323,20 +421,24 @@ export async function getMarylandBills(options: {
     
     // Cache results
     if (!search) {
-      billsCache = { data: bills, sessionId, timestamp: Date.now() };
+      billsCacheByState.set(cacheKey, { data: bills, sessionId, timestamp: Date.now() });
     }
     
     return bills.slice(0, limit);
   } catch (error) {
-    console.error('Error fetching Maryland bills from LegiScan:', error);
-    // Return cached data if available
-    if (billsCache) {
-      return billsCache.data.slice(0, limit);
+    console.error(`Error fetching ${stateCode} bills from LegiScan:`, error);
+    const cacheKey = `${stateCode}-${options.sessionId || 'current'}`;
+    const cached = billsCacheByState.get(cacheKey);
+    if (cached) {
+      return cached.data.slice(0, limit);
     }
     return [];
   }
 }
 
+/**
+ * Get detailed bill information
+ */
 export async function getBillDetail(billId: number): Promise<NormalizedBillDetail | null> {
   try {
     const response = await makeLegiScanRequest<{
@@ -347,14 +449,16 @@ export async function getBillDetail(billId: number): Promise<NormalizedBillDetai
     const bill = response.bill;
     if (!bill) return null;
     
-    // Normalize snake_case to camelCase DTO
+    const stateCode = bill.state || 'MD';
+    
     return {
       billId: bill.bill_id,
       billNumber: bill.bill_number,
       billType: bill.bill_type,
       title: bill.title,
       description: bill.description || bill.title,
-      state: bill.state || 'MD',
+      state: stateCode,
+      stateName: getStateName(stateCode),
       status: STATUS_MAP[bill.status] || 'introduced',
       statusDate: bill.status_date || null,
       history: Array.isArray(bill.history) 
@@ -396,7 +500,8 @@ export async function getBillDetail(billId: number): Promise<NormalizedBillDetai
       subjects: Array.isArray(bill.subjects)
         ? bill.subjects.map(s => s.subject_name || '')
         : [],
-      url: `https://mgaleg.maryland.gov/mgawebsite/Legislation/Details/${bill.bill_number}?ys=${new Date().getFullYear()}`,
+      url: bill.url || getStateLegislatureUrl(stateCode, bill.bill_number),
+      legislatureUrl: getStateLegislatureUrl(stateCode, bill.bill_number),
       isLiveData: true
     };
   } catch (error) {
@@ -405,12 +510,16 @@ export async function getBillDetail(billId: number): Promise<NormalizedBillDetai
   }
 }
 
+/**
+ * Search bills across a state
+ */
 export async function searchBills(query: string, state: string = 'MD'): Promise<LegiScanBillResult[]> {
+  const stateCode = state.toUpperCase();
   try {
     const response = await makeLegiScanRequest<{
       status: string;
       searchresult: Record<string, any>;
-    }>('search', { state, query });
+    }>('search', { state: stateCode, query });
     
     if (!response.searchresult) {
       return [];
@@ -428,7 +537,8 @@ export async function searchBills(query: string, state: string = 'MD'): Promise<
         lastAction: bill.last_action || '',
         lastActionDate: bill.last_action_date || null,
         url: bill.url,
-        state: bill.state,
+        state: bill.state || stateCode,
+        stateName: getStateName(bill.state || stateCode),
         sponsors: [],
         subjects: [],
         isLiveData: true,
@@ -441,19 +551,46 @@ export async function searchBills(query: string, state: string = 'MD'): Promise<
   }
 }
 
-// Test the API connection
-export async function testConnection(): Promise<{ success: boolean; message: string }> {
+/**
+ * Test API connection with a specific state
+ */
+export async function testConnection(stateCode: string = 'MD'): Promise<{ success: boolean; message: string; state: string }> {
+  const state = stateCode.toUpperCase();
   try {
-    const sessions = await getMarylandSessions();
+    const sessions = await getStateSessions(state);
     if (sessions.length > 0) {
       return { 
         success: true, 
-        message: `Connected to LegiScan. Found ${sessions.length} Maryland sessions.` 
+        message: `Connected to LegiScan. Found ${sessions.length} ${getStateName(state)} sessions.`,
+        state
       };
     }
-    return { success: false, message: 'No Maryland sessions found' };
+    return { success: false, message: `No ${getStateName(state)} sessions found`, state };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return { success: false, message: `Connection failed: ${errorMessage}` };
+    return { success: false, message: `Connection failed: ${errorMessage}`, state };
   }
+}
+
+// ============================================
+// BACKWARD COMPATIBILITY - Maryland aliases
+// ============================================
+
+/** @deprecated Use getStateSessions('MD') instead */
+export async function getMarylandSessions(): Promise<LegiScanSession[]> {
+  return getStateSessions('MD');
+}
+
+/** @deprecated Use getCurrentStateSession('MD') instead */
+export async function getCurrentMarylandSession(): Promise<LegiScanSession | null> {
+  return getCurrentStateSession('MD');
+}
+
+/** @deprecated Use getStateBills({ state: 'MD', ... }) instead */
+export async function getMarylandBills(options: {
+  sessionId?: number;
+  limit?: number;
+  search?: string;
+} = {}): Promise<LegiScanBillResult[]> {
+  return getStateBills({ ...options, state: 'MD' });
 }

@@ -9,7 +9,8 @@ import type { BillStatus } from "@/components/StatusBadge";
 import type { Topic } from "@/components/TopicBadge";
 import type { Bill } from "@shared/schema";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Zap, FileText } from "lucide-react";
+import { Loader2, Zap, FileText, MapPin } from "lucide-react";
+import { useUserLocation } from "@/contexts/LocationContext";
 
 function mapBillToCardFormat(bill: Bill): BillCardType {
   const statusMap: Record<string, BillStatus> = {
@@ -37,6 +38,7 @@ function mapBillToCardFormat(bill: Bill): BillCardType {
 
 export default function Dashboard() {
   const [location] = useLocation();
+  const { location: userLocation } = useUserLocation();
   const searchParams = new URLSearchParams(location.split("?")[1] || "");
   const initialTopic = (searchParams.get("topic") as Topic) || "all";
 
@@ -44,9 +46,18 @@ export default function Dashboard() {
   const [topicFilter, setTopicFilter] = useState<Topic | "all">(initialTopic);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Fetch bills from unified endpoint (handles both LegiScan and database)
+  // Get current state code from location context
+  const stateCode = userLocation.stateCode || 'MD';
+  const stateName = userLocation.state || 'Maryland';
+
+  // Fetch bills from unified endpoint with state parameter
   const { data: bills = [], isLoading } = useQuery<Bill[]>({
-    queryKey: ["/api/bills"],
+    queryKey: ["/api/bills", { state: stateCode }],
+    queryFn: async () => {
+      const response = await fetch(`/api/bills?state=${stateCode}`);
+      if (!response.ok) throw new Error('Failed to fetch bills');
+      return response.json();
+    },
     retry: 2,
   });
 
@@ -107,8 +118,12 @@ export default function Dashboard() {
         <div className="mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
           <div className="flex items-center gap-3 mb-3">
             <h1 className="text-3xl font-semibold text-foreground" data-testid="text-page-title">
-              Maryland State Legislation
+              {stateName} State Legislation
             </h1>
+            <Badge className="bg-primary/10 text-primary gap-1">
+              <MapPin className="h-3 w-3" />
+              {stateCode}
+            </Badge>
             {hasLiveData ? (
               <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 gap-1">
                 <Zap className="h-3 w-3" />
@@ -123,8 +138,8 @@ export default function Dashboard() {
           </div>
           <p className="text-lg text-muted-foreground">
             {(bills || []).length > 0
-              ? `Tracking ${(bills || []).length} bills from the Maryland General Assembly`
-              : "Loading bills from Maryland legislature..."
+              ? `Tracking ${(bills || []).length} bills from the ${stateName} Legislature`
+              : `Loading bills from ${stateName} legislature...`
             }
           </p>
         </div>

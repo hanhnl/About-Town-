@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "@shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured } from "./legiscan-service";
+import { getStateBills, getStateSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getStateName, getMarylandBills, getMarylandSessions } from "./legiscan-service";
 import { z } from "zod";
 
 // Helper function to map LegiScan status to our frontend format
@@ -84,6 +84,7 @@ export async function registerRoutes(
     const search = req.query.search as string | undefined;
     const status = req.query.status as string | undefined;
     const topic = req.query.topic as string | undefined;
+    const state = (req.query.state as string)?.toUpperCase() || 'MD'; // NEW: Accept state parameter
     const usePagination = page > 0;
 
     try {
@@ -91,8 +92,8 @@ export async function registerRoutes(
       // Try LegiScan API first
       if (isLegiScanConfigured()) {
         try {
-          console.log('🔄 Fetching bills from LegiScan API...');
-          const legiScanBills = await getMarylandBills({ limit: limit * page, search });
+          console.log(`🔄 Fetching ${state} bills from LegiScan API...`);
+          const legiScanBills = await getStateBills({ state, limit: limit * page, search });
 
           if (legiScanBills.length > 0) {
             // Convert LegiScan format to frontend format
@@ -106,7 +107,9 @@ export async function registerRoutes(
               voteDate: bill.statusDate || bill.lastActionDate || new Date().toISOString().split('T')[0],
               supportVotes: Math.floor(Math.random() * 80) + 10, // TODO: Get real votes from LegiScan
               opposeVotes: Math.floor(Math.random() * 30) + 5,
-              sourceUrl: bill.url || "https://mgaleg.maryland.gov/",
+              sourceUrl: bill.url || "https://legiscan.com/",
+              state: bill.state,
+              stateName: bill.stateName,
               isLiveData: true,
               lastAction: bill.lastAction,
             }));
@@ -125,17 +128,19 @@ export async function registerRoutes(
               const endIndex = startIndex + limit;
               const paginatedBills = bills.slice(startIndex, endIndex);
 
-              console.log(`✅ Returning ${paginatedBills.length} bills from LegiScan API (page ${page})`);
+              console.log(`✅ Returning ${paginatedBills.length} ${state} bills from LegiScan API (page ${page})`);
               return res.json({
                 bills: paginatedBills,
                 total: bills.length,
                 page,
                 limit,
+                state,
+                stateName: getStateName(state),
                 totalPages: Math.ceil(bills.length / limit)
               });
             } else {
               // Return all bills (up to limit) for backwards compatibility
-              console.log(`✅ Returning ${bills.length} bills from LegiScan API`);
+              console.log(`✅ Returning ${bills.length} ${state} bills from LegiScan API`);
               return res.json(bills.slice(0, limit));
             }
           }
@@ -146,32 +151,37 @@ export async function registerRoutes(
         console.log('ℹ️  LegiScan API key not configured, using sample data');
       }
 
-      // Fallback to hardcoded sample bills
+      // Fallback to hardcoded sample bills (when LegiScan unavailable)
+      const stateName = getStateName(state);
       const sampleBills = [
         {
           id: 1,
           billNumber: "HB0001",
-          title: "Maryland Education Reform Act",
-          summary: "Establishes new funding mechanisms for public schools across Maryland, focusing on equity and access to resources.",
+          title: `${stateName} Education Reform Act`,
+          summary: `Establishes new funding mechanisms for public schools across ${stateName}, focusing on equity and access to resources.`,
           status: "in_committee",
           topic: "education",
           voteDate: "2025-03-15",
           supportVotes: 45,
           opposeVotes: 12,
-          sourceUrl: "https://mgaleg.maryland.gov/",
+          sourceUrl: "https://legiscan.com/",
+          state: state,
+          stateName: stateName,
           isLiveData: false,
         },
         {
           id: 2,
           billNumber: "SB0123",
           title: "Clean Energy Initiative",
-          summary: "Expands Maryland's renewable energy portfolio and sets aggressive targets for carbon emissions reduction by 2030.",
+          summary: `Expands ${stateName}'s renewable energy portfolio and sets aggressive targets for carbon emissions reduction by 2030.`,
           status: "passed",
           topic: "environment",
           voteDate: "2025-02-28",
           supportVotes: 67,
           opposeVotes: 8,
-          sourceUrl: "https://mgaleg.maryland.gov/",
+          sourceUrl: "https://legiscan.com/",
+          state: state,
+          stateName: stateName,
           isLiveData: false,
         },
         {
@@ -184,33 +194,39 @@ export async function registerRoutes(
           voteDate: "2025-04-01",
           supportVotes: 23,
           opposeVotes: 5,
-          sourceUrl: "https://mgaleg.maryland.gov/",
+          sourceUrl: "https://legiscan.com/",
+          state: state,
+          stateName: stateName,
           isLiveData: false,
         },
         {
           id: 4,
           billNumber: "SB0789",
           title: "Transportation Infrastructure Improvement",
-          summary: "Allocates funding for road, bridge, and public transit improvements throughout Maryland.",
+          summary: `Allocates funding for road, bridge, and public transit improvements throughout ${stateName}.`,
           status: "in_committee",
           topic: "transportation",
           voteDate: "2025-03-20",
           supportVotes: 34,
           opposeVotes: 15,
-          sourceUrl: "https://mgaleg.maryland.gov/",
+          sourceUrl: "https://legiscan.com/",
+          state: state,
+          stateName: stateName,
           isLiveData: false,
         },
         {
           id: 5,
           billNumber: "HB0234",
           title: "Healthcare Access Expansion",
-          summary: "Expands Medicaid coverage and reduces prescription drug costs for Maryland residents.",
+          summary: `Expands Medicaid coverage and reduces prescription drug costs for ${stateName} residents.`,
           status: "passed",
           topic: "healthcare",
           voteDate: "2025-02-15",
           supportVotes: 52,
           opposeVotes: 9,
-          sourceUrl: "https://mgaleg.maryland.gov/",
+          sourceUrl: "https://legiscan.com/",
+          state: state,
+          stateName: stateName,
           isLiveData: false,
         },
       ];
@@ -238,17 +254,19 @@ export async function registerRoutes(
         const endIndex = startIndex + limit;
         const paginatedSampleBills = filteredSampleBills.slice(startIndex, endIndex);
 
-        console.log(`📊 /api/bills - Returning ${paginatedSampleBills.length} sample Maryland bills (page ${page})`);
+        console.log(`📊 /api/bills - Returning ${paginatedSampleBills.length} sample ${state} bills (page ${page})`);
         res.json({
           bills: paginatedSampleBills,
           total: filteredSampleBills.length,
           page,
           limit,
+          state,
+          stateName,
           totalPages: Math.ceil(filteredSampleBills.length / limit)
         });
       } else {
         // Backwards compatible - return array
-        console.log(`📊 /api/bills - Returning ${filteredSampleBills.slice(0, limit).length} sample Maryland bills`);
+        console.log(`📊 /api/bills - Returning ${filteredSampleBills.slice(0, limit).length} sample ${state} bills`);
         res.json(filteredSampleBills.slice(0, limit));
       }
     } catch (error) {
@@ -462,29 +480,31 @@ export async function registerRoutes(
         }
       }
 
-      // Accept all zipcodes - Maryland state legislation available for all
+      // Accept all zipcodes - state legislation available for all 50 states
       // User can browse bills from LegiScan API
       return res.json({
         zipcode,
         city: null,
-        state: 'MD',
+        state: null, // State will be detected via geolocation or user selection
+        stateCode: null,
         neighborhoods: null,
         jurisdiction: null,
         supported: true,
         hasJurisdiction: false,
-        message: "Showing Maryland state legislation. Enter any Maryland ZIP code to explore bills."
+        message: "Enter your ZIP code or use location detection to see your state's legislation."
       });
     } catch (error) {
       // Fallback: accept the zipcode anyway
       return res.json({
         zipcode: req.params.zipcode,
         city: null,
-        state: 'MD',
+        state: null,
+        stateCode: null,
         neighborhoods: null,
         jurisdiction: null,
         supported: true,
         hasJurisdiction: false,
-        message: "Showing Maryland state legislation."
+        message: "All 50 states supported. Select your state to view legislation."
       });
     }
   });
@@ -539,7 +559,7 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/legiscan/sessions", async (_req, res) => {
+  app.get("/api/legiscan/sessions", async (req, res) => {
     if (!isLegiScanConfigured()) {
       return res.status(503).json({ 
         error: "LegiScan API not configured",
@@ -548,10 +568,12 @@ export async function registerRoutes(
       });
     }
     try {
-      const sessions = await getMarylandSessions();
-      res.json(sessions);
+      const state = (req.query.state as string)?.toUpperCase() || 'MD';
+      const sessions = await getStateSessions(state);
+      res.json({ sessions, state, stateName: getStateName(state) });
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch Maryland sessions" });
+      const state = (req.query.state as string)?.toUpperCase() || 'MD';
+      res.status(500).json({ error: `Failed to fetch ${getStateName(state)} sessions` });
     }
   });
 
@@ -564,15 +586,18 @@ export async function registerRoutes(
       });
     }
     try {
-      const { limit, sessionId, search } = req.query;
-      const bills = await getMarylandBills({
+      const { limit, sessionId, search, state } = req.query;
+      const stateCode = (state as string)?.toUpperCase() || 'MD';
+      const bills = await getStateBills({
+        state: stateCode,
         limit: limit ? parseInt(limit as string) : 50,
         sessionId: sessionId ? parseInt(sessionId as string) : undefined,
         search: typeof search === 'string' ? search : undefined,
       });
-      res.json(bills);
+      res.json({ bills, state: stateCode, stateName: getStateName(stateCode) });
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch Maryland state bills" });
+      const stateCode = (req.query.state as string)?.toUpperCase() || 'MD';
+      res.status(500).json({ error: `Failed to fetch ${getStateName(stateCode)} state bills` });
     }
   });
 

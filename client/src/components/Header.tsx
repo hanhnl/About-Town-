@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useLocation as useWouterLocation } from "wouter";
-import { Menu, X, User, MapPin, Check, AlertCircle, UserPlus, LogOut, Star, Crosshair, Loader2 } from "lucide-react";
+import { Menu, X, User, MapPin, Check, AlertCircle, UserPlus, LogOut, Star, Crosshair, Loader2, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "./ThemeToggle";
@@ -17,14 +17,42 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useUserLocation } from "@/contexts/LocationContext";
+
+// All US states for the selector
+const US_STATES = [
+  { code: 'AL', name: 'Alabama' }, { code: 'AK', name: 'Alaska' }, { code: 'AZ', name: 'Arizona' },
+  { code: 'AR', name: 'Arkansas' }, { code: 'CA', name: 'California' }, { code: 'CO', name: 'Colorado' },
+  { code: 'CT', name: 'Connecticut' }, { code: 'DE', name: 'Delaware' }, { code: 'FL', name: 'Florida' },
+  { code: 'GA', name: 'Georgia' }, { code: 'HI', name: 'Hawaii' }, { code: 'ID', name: 'Idaho' },
+  { code: 'IL', name: 'Illinois' }, { code: 'IN', name: 'Indiana' }, { code: 'IA', name: 'Iowa' },
+  { code: 'KS', name: 'Kansas' }, { code: 'KY', name: 'Kentucky' }, { code: 'LA', name: 'Louisiana' },
+  { code: 'ME', name: 'Maine' }, { code: 'MD', name: 'Maryland' }, { code: 'MA', name: 'Massachusetts' },
+  { code: 'MI', name: 'Michigan' }, { code: 'MN', name: 'Minnesota' }, { code: 'MS', name: 'Mississippi' },
+  { code: 'MO', name: 'Missouri' }, { code: 'MT', name: 'Montana' }, { code: 'NE', name: 'Nebraska' },
+  { code: 'NV', name: 'Nevada' }, { code: 'NH', name: 'New Hampshire' }, { code: 'NJ', name: 'New Jersey' },
+  { code: 'NM', name: 'New Mexico' }, { code: 'NY', name: 'New York' }, { code: 'NC', name: 'North Carolina' },
+  { code: 'ND', name: 'North Dakota' }, { code: 'OH', name: 'Ohio' }, { code: 'OK', name: 'Oklahoma' },
+  { code: 'OR', name: 'Oregon' }, { code: 'PA', name: 'Pennsylvania' }, { code: 'RI', name: 'Rhode Island' },
+  { code: 'SC', name: 'South Carolina' }, { code: 'SD', name: 'South Dakota' }, { code: 'TN', name: 'Tennessee' },
+  { code: 'TX', name: 'Texas' }, { code: 'UT', name: 'Utah' }, { code: 'VT', name: 'Vermont' },
+  { code: 'VA', name: 'Virginia' }, { code: 'WA', name: 'Washington' }, { code: 'WV', name: 'West Virginia' },
+  { code: 'WI', name: 'Wisconsin' }, { code: 'WY', name: 'Wyoming' }, { code: 'DC', name: 'Washington DC' },
+];
 import { useAuth } from "@/contexts/AuthContext";
 
 export function Header() {
   const { user, isLoggedIn, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useWouterLocation();
-  const { location: userLocation, setZipcode, detectLocation, isSupported, isLoading, isDetecting, hasJurisdiction, locationError } = useUserLocation();
+  const { location: userLocation, setZipcode, setStateCode, detectLocation, isSupported, isLoading, isDetecting, hasJurisdiction, locationError } = useUserLocation();
   const [zipcodeInput, setZipcodeInput] = useState(userLocation.zipcode);
   const [popoverOpen, setPopoverOpen] = useState(false);
 
@@ -80,6 +108,25 @@ export function Header() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* State Selector */}
+            <Select
+              value={userLocation.stateCode || 'MD'}
+              onValueChange={(value) => setStateCode(value)}
+            >
+              <SelectTrigger className="hidden sm:flex w-auto gap-1 text-sm bg-primary text-primary-foreground px-3 py-1.5 h-auto border-0" data-testid="select-state">
+                <MapPin className="h-4 w-4" />
+                <SelectValue placeholder="Select state" />
+              </SelectTrigger>
+              <SelectContent className="max-h-[300px]">
+                {US_STATES.map((state) => (
+                  <SelectItem key={state.code} value={state.code}>
+                    {state.code} - {state.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Location Popover */}
             <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -87,7 +134,7 @@ export function Header() {
                   className="hidden sm:flex items-center gap-1 text-sm text-muted-foreground bg-muted px-3 py-1.5 h-auto"
                   data-testid="button-zipcode"
                 >
-                  <MapPin className="h-4 w-4" />
+                  <Crosshair className="h-4 w-4" />
                   <span data-testid="text-zipcode">{userLocation.zipcode}</span>
                   {userLocation.city && (
                     <span className="text-xs opacity-70">({userLocation.city})</span>
@@ -239,6 +286,23 @@ export function Header() {
                   </Button>
                 </Link>
               ))}
+              {/* Mobile State Selector */}
+              <Select
+                value={userLocation.stateCode || 'MD'}
+                onValueChange={(value) => setStateCode(value)}
+              >
+                <SelectTrigger className="w-full justify-start gap-2 bg-primary text-primary-foreground" data-testid="select-state-mobile">
+                  <MapPin className="h-4 w-4" />
+                  <SelectValue placeholder="Select state" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {US_STATES.map((state) => (
+                    <SelectItem key={state.code} value={state.code}>
+                      {state.code} - {state.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button
                 variant="ghost"
                 className="w-full justify-start gap-2 text-muted-foreground"
@@ -248,7 +312,7 @@ export function Header() {
                 }}
                 data-testid="button-mobile-zipcode"
               >
-                <MapPin className="h-4 w-4" />
+                <Crosshair className="h-4 w-4" />
                 <span>{userLocation.zipcode}</span>
                 {userLocation.city && (
                   <span className="text-xs opacity-70">({userLocation.city})</span>

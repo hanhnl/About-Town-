@@ -16,6 +16,7 @@ interface LocationInfo {
 interface LocationContextType {
   location: LocationInfo;
   setZipcode: (zipcode: string) => void;
+  setStateCode: (stateCode: string) => void;
   detectLocation: () => Promise<void>;
   isLoading: boolean;
   isDetecting: boolean;
@@ -179,6 +180,14 @@ export function LocationProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Allow manual state selection
+  const setStateCodeManual = (newStateCode: string) => {
+    setStateCode(newStateCode.toUpperCase());
+    if (typeof window !== "undefined") {
+      localStorage.setItem("townsquare-state", newStateCode.toUpperCase());
+    }
+  };
+
   useEffect(() => {
     if (zipcode && typeof window !== "undefined") {
       localStorage.setItem("townsquare-zipcode", zipcode);
@@ -190,6 +199,7 @@ export function LocationProvider({ children }: { children: ReactNode }) {
       value={{
         location,
         setZipcode,
+        setStateCode: setStateCodeManual,
         detectLocation,
         isLoading,
         isDetecting,
