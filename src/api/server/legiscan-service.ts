@@ -355,14 +355,29 @@ export async function getMarylandBills(options: {
 }
 
 export async function getBillDetail(billId: number): Promise<NormalizedBillDetail | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error('[LegiScan] No API key for bill detail');
+    return null;
+  }
+  
   try {
-    const response = await makeLegiScanRequest<{
-      status: string;
-      bill: LegiScanBillDetail;
-    }>('getBill', { id: String(billId) });
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getBill&id=${billId}`;
+    const response = await fetch(url);
+    const data = await response.json() as any;
     
-    const bill = response.bill;
-    if (!bill) return null;
+    if (data.status === 'ERROR') {
+      console.error('[LegiScan] Bill detail API error:', data.alert?.message);
+      return null;
+    }
+    
+    const bill = data.bill;
+    if (!bill) {
+      console.log('[LegiScan] No bill data returned for id:', billId);
+      return null;
+    }
+    
+    console.log('[LegiScan] Got bill detail:', bill.bill_number);
     
     // Normalize snake_case to camelCase DTO
     return {

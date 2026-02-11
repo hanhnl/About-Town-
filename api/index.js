@@ -40328,10 +40328,25 @@ async function getMarylandBills(options = {}) {
   }
 }
 async function getBillDetail(billId) {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error("[LegiScan] No API key for bill detail");
+    return null;
+  }
   try {
-    const response = await makeLegiScanRequest("getBill", { id: String(billId) });
-    const bill = response.bill;
-    if (!bill) return null;
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getBill&id=${billId}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    if (data.status === "ERROR") {
+      console.error("[LegiScan] Bill detail API error:", data.alert?.message);
+      return null;
+    }
+    const bill = data.bill;
+    if (!bill) {
+      console.log("[LegiScan] No bill data returned for id:", billId);
+      return null;
+    }
+    console.log("[LegiScan] Got bill detail:", bill.bill_number);
     return {
       billId: bill.bill_id,
       billNumber: bill.bill_number,
@@ -41065,12 +41080,39 @@ async function registerRoutes(httpServer2, app2) {
   app2.get("/api/bills/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      if (isLegiScanConfigured()) {
+        try {
+          const legiScanBill = await getBillDetail(id);
+          if (legiScanBill) {
+            return res.json({
+              id: legiScanBill.billId,
+              billNumber: legiScanBill.billNumber,
+              title: legiScanBill.title,
+              summary: legiScanBill.description,
+              status: legiScanBill.status,
+              topic: inferTopicFromSubjects(legiScanBill.subjects, legiScanBill.title, legiScanBill.description),
+              voteDate: legiScanBill.statusDate || (/* @__PURE__ */ new Date()).toISOString().split("T")[0],
+              sourceUrl: legiScanBill.url,
+              isLiveData: true,
+              // Additional detail fields
+              history: legiScanBill.history,
+              sponsors: legiScanBill.sponsors,
+              votes: legiScanBill.votes,
+              texts: legiScanBill.texts,
+              subjects: legiScanBill.subjects
+            });
+          }
+        } catch (legiScanError) {
+          console.warn("[API] LegiScan bill detail failed:", legiScanError);
+        }
+      }
       const bill = await storage.getBill(id);
       if (!bill) {
         return res.status(404).json({ error: "Bill not found" });
       }
       res.json(bill);
     } catch (error) {
+      console.error("[API] Bill detail error:", error);
       res.status(500).json({ error: "Failed to fetch bill" });
     }
   });
