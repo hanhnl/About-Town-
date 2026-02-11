@@ -15,8 +15,8 @@ interface SEOProps {
 }
 
 const BASE_URL = 'https://abouttown.app';
-const DEFAULT_TITLE = 'About Town - Track Local Legislation | California Bills Made Simple';
-const DEFAULT_DESCRIPTION = 'Track California legislation affecting your community. About Town simplifies bills, explains their impact, and helps citizens engage with local government.';
+const DEFAULT_TITLE = 'About Town - Track US State Legislation | Bills Made Simple';
+const DEFAULT_DESCRIPTION = 'Track legislation across all 50 US states. About Town simplifies bills, explains their impact, and helps citizens engage with state government. Free, no jargon.';
 const DEFAULT_IMAGE = `${BASE_URL}/og-image.png`;
 
 export function SEO({
@@ -98,7 +98,7 @@ export function SEO({
         legislationType: legislationType || 'Bill',
         legislationJurisdiction: {
           '@type': 'AdministrativeArea',
-          name: 'California',
+          name: 'United States',
           addressCountry: 'US',
         },
         url: fullUrl,
@@ -127,32 +127,32 @@ export function SEO({
 export const SEO_PAGES = {
   home: {
     title: undefined, // Uses default
-    description: 'Track California legislation affecting your community. About Town simplifies bills, explains their impact, and helps citizens engage with local government. Free, no jargon.',
-    keywords: 'California legislation, local bills, civic engagement, track legislation, California Assembly bills, California Senate bills',
+    description: 'Track legislation across all 50 US states. About Town simplifies bills, explains their impact, and helps citizens engage with state government. Free, no jargon.',
+    keywords: 'state legislation, track bills, civic engagement, US state legislature, bill tracker, legislation tracker',
     url: '/',
   },
   dashboard: {
     title: 'Track Bills',
-    description: 'View and track California bills in real-time. Filter by topic, status, and location. Get AI-powered summaries and understand how legislation affects your community.',
-    keywords: 'track California bills, legislation tracker, bill status, California Assembly, California Senate, bill updates',
+    description: 'View and track state bills in real-time across all 50 US states. Filter by topic, status, and location. Get plain-English summaries and understand how legislation affects your community.',
+    keywords: 'track state bills, legislation tracker, bill status, state legislature, bill updates, California bills, New York bills, Texas bills',
     url: '/dashboard',
   },
   issues: {
     title: 'Browse Issues',
-    description: 'Explore California legislation by topic. From housing to healthcare, education to environment - find bills that matter to you and your community.',
-    keywords: 'California issues, legislation topics, housing bills, healthcare legislation, education bills, environmental policy California',
+    description: 'Explore state legislation by topic. From housing to healthcare, education to environment - find bills that matter to you and your community.',
+    keywords: 'state legislation topics, housing bills, healthcare legislation, education bills, environmental policy, state issues',
     url: '/issues',
   },
   representatives: {
     title: 'Find Your Representatives',
-    description: 'Find your California state representatives. See their voting records, sponsored bills, and contact information. Connect with your elected officials.',
-    keywords: 'California representatives, state assembly member, state senator, find my representative, elected officials California, voting records',
+    description: 'Find your state representatives. See their voting records, sponsored bills, and contact information. Connect with your elected officials.',
+    keywords: 'state representatives, find my representative, state senator, state assembly, elected officials, voting records',
     url: '/representatives',
   },
   about: {
     title: 'About Us',
-    description: 'About Town is a free, non-partisan civic engagement platform. We make California legislation accessible to everyone. By the people, for the people.',
-    keywords: 'about About Town, civic engagement, government transparency, legislation access, civic tech',
+    description: 'About Town is a free, non-partisan civic engagement platform. We make state legislation accessible to everyone across all 50 US states. By the people, for the people.',
+    keywords: 'about About Town, civic engagement, government transparency, legislation access, civic tech, all 50 states',
     url: '/about',
   },
   signup: {
