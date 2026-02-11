@@ -288,6 +288,42 @@ export async function registerRoutes(
   app.get("/api/bills/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // For large IDs (LegiScan bills), try LegiScan API first
+      if (id > 100000 && isLegiScanConfigured()) {
+        try {
+          const legiScanBill = await getBillDetail(id);
+          if (legiScanBill) {
+            // Convert LegiScan format to our format
+            return res.json({
+              id: legiScanBill.billId,
+              billNumber: legiScanBill.billNumber,
+              title: legiScanBill.title,
+              summary: legiScanBill.description,
+              fullText: null,
+              status: legiScanBill.status,
+              topic: inferTopicFromSubjects(legiScanBill.subjects, legiScanBill.title, legiScanBill.description),
+              voteDate: legiScanBill.statusDate,
+              sponsorName: legiScanBill.sponsors?.[0]?.name || null,
+              sourceUrl: legiScanBill.url,
+              supportVotes: 0,
+              opposeVotes: 0,
+              state: legiScanBill.state,
+              stateName: legiScanBill.stateName,
+              sponsors: legiScanBill.sponsors,
+              history: legiScanBill.history,
+              votes: legiScanBill.votes,
+              texts: legiScanBill.texts,
+              subjects: legiScanBill.subjects,
+              isLiveData: true,
+            });
+          }
+        } catch (legiScanError) {
+          console.warn('LegiScan bill detail fetch failed:', legiScanError);
+        }
+      }
+      
+      // Fallback to local database
       const bill = await storage.getBill(id);
       if (!bill) {
         return res.status(404).json({ error: "Bill not found" });
