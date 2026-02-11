@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -8,30 +9,44 @@ import { LocationProvider } from "@/contexts/LocationContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Header } from "@/components/Header";
-import NotFound from "@/pages/not-found";
-import Landing from "@/pages/Landing";
-import Dashboard from "@/pages/Dashboard";
-import Issues from "@/pages/Issues";
-import BillDetail from "@/pages/BillDetail";
-import About from "@/pages/About";
-import Representatives from "@/pages/Representatives";
-import SignUp from "@/pages/SignUp";
-import MyProfile from "@/pages/MyProfile";
+import { Loader2 } from "lucide-react";
+
+// Lazy load pages for better performance (code-splitting)
+const Landing = lazy(() => import("@/pages/Landing"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const Issues = lazy(() => import("@/pages/Issues"));
+const BillDetail = lazy(() => import("@/pages/BillDetail"));
+const About = lazy(() => import("@/pages/About"));
+const Representatives = lazy(() => import("@/pages/Representatives"));
+const SignUp = lazy(() => import("@/pages/SignUp"));
+const MyProfile = lazy(() => import("@/pages/MyProfile"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="min-h-[50vh] flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Landing} />
-      <Route path="/dashboard" component={Dashboard} />
-      <Route path="/issues" component={Issues} />
-      <Route path="/representatives" component={Representatives} />
-      <Route path="/about" component={About} />
-      <Route path="/signup" component={SignUp} />
-      <Route path="/profile" component={MyProfile} />
-      <Route path="/my-profile" component={MyProfile} />
-      <Route path="/bill/:id" component={BillDetail} />
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<PageLoader />}>
+      <Switch>
+        <Route path="/" component={Landing} />
+        <Route path="/dashboard" component={Dashboard} />
+        <Route path="/issues" component={Issues} />
+        <Route path="/representatives" component={Representatives} />
+        <Route path="/about" component={About} />
+        <Route path="/signup" component={SignUp} />
+        <Route path="/profile" component={MyProfile} />
+        <Route path="/my-profile" component={MyProfile} />
+        <Route path="/bill/:id" component={BillDetail} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
