@@ -1,4 +1,4 @@
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { MessageSquare, ThumbsUp, ThumbsDown, Calendar, ExternalLink } from "lucide-react";
@@ -35,12 +35,25 @@ function isValidHttpUrl(url: string): boolean {
 }
 
 export function BillCard({ bill }: BillCardProps) {
+  const [, setLocation] = useLocation();
   const safeSourceUrl = bill.sourceUrl && isValidHttpUrl(bill.sourceUrl) ? bill.sourceUrl : null;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't navigate if clicking on interactive elements
+    const target = e.target as HTMLElement;
+    if (target.closest('a, button, [role="button"]')) {
+      return;
+    }
+    setLocation(`/bill/${bill.id}`);
+  };
 
   return (
     <Card
-      className="hover-elevate h-full"
+      className="hover-elevate h-full cursor-pointer transition-all hover:border-primary/50"
       data-testid={`card-bill-${bill.id}`}
+      onClick={handleCardClick}
+      role="article"
+      aria-label={`Bill ${bill.billNumber}: ${bill.title}`}
     >
       <CardContent className="p-6">
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -50,7 +63,7 @@ export function BillCard({ bill }: BillCardProps) {
             </span>
             <StatusBadge status={bill.status} />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
             <TopicBadge topic={bill.topic} />
             <ShareButton
               title={bill.title}
@@ -64,14 +77,12 @@ export function BillCard({ bill }: BillCardProps) {
           </div>
         </div>
 
-        <Link href={`/bill/${bill.id}`}>
-          <h3
-            className="text-xl font-medium text-foreground mb-3 line-clamp-2 hover:text-primary cursor-pointer"
-            data-testid={`text-bill-title-${bill.id}`}
-          >
-            {bill.title}
-          </h3>
-        </Link>
+        <h3
+          className="text-xl font-medium text-foreground mb-3 line-clamp-2 hover:text-primary"
+          data-testid={`text-bill-title-${bill.id}`}
+        >
+          {bill.title}
+        </h3>
 
         <p
           className="text-base text-muted-foreground leading-relaxed mb-4 line-clamp-3"
@@ -126,11 +137,9 @@ export function BillCard({ bill }: BillCardProps) {
           </div>
         </div>
 
-        <Button variant="outline" size="sm" className="w-full mt-4" asChild>
-          <Link href={`/bill/${bill.id}`} data-testid={`button-view-details-${bill.id}`}>
-            View Details
-          </Link>
-        </Button>
+        <div className="text-center mt-4 text-sm text-muted-foreground">
+          Click anywhere to view details →
+        </div>
       </CardContent>
     </Card>
   );

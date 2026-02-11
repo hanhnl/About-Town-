@@ -25,7 +25,9 @@ import {
   Car,
   Building2,
   Landmark,
-  CheckCircle2
+  CheckCircle2,
+  Locate,
+  Loader2
 } from "lucide-react";
 import { NeighborhoodGridLogo } from "@/components/NeighborhoodGridLogo";
 import { NewsletterSignup } from "@/components/NewsletterSignup";
@@ -84,7 +86,88 @@ export default function Landing() {
   const [, setLocation] = useLocation();
   const [zipcode, setZipcode] = useState("");
   const [zipcodeError, setZipcodeError] = useState("");
-  const { location: userLocation } = useUserLocation();
+  const [isLocating, setIsLocating] = useState(false);
+  const { location: userLocation, setLocation: setUserLocation } = useUserLocation();
+
+  // Get user's current location via geolocation
+  const handleUseMyLocation = async () => {
+    if (!navigator.geolocation) {
+      setZipcodeError("Geolocation is not supported by your browser");
+      return;
+    }
+
+    setIsLocating(true);
+    setZipcodeError("");
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          // Reverse geocode to get ZIP code using free API
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&addressdetails=1`,
+            { headers: { 'User-Agent': 'AboutTown/1.0' } }
+          );
+          const data = await response.json();
+          
+          if (data.address?.postcode) {
+            const zip = data.address.postcode.split('-')[0]; // Handle ZIP+4
+            setZipcode(zip);
+            // Also store it
+            localStorage.setItem("townsquare-zipcode", zip);
+            
+            // Update location context if we got state info
+            if (data.address?.state) {
+              setUserLocation({
+                zipCode: zip,
+                city: data.address.city || data.address.town || data.address.village,
+                state: data.address.state,
+                stateCode: getStateCode(data.address.state),
+              });
+            }
+          } else {
+            setZipcodeError("Could not find ZIP code for your location");
+          }
+        } catch (error) {
+          setZipcodeError("Could not determine your location");
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      (error) => {
+        setIsLocating(false);
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            setZipcodeError("Location access denied. Please enter ZIP manually.");
+            break;
+          case error.POSITION_UNAVAILABLE:
+            setZipcodeError("Location unavailable. Please enter ZIP manually.");
+            break;
+          default:
+            setZipcodeError("Could not get location. Please enter ZIP manually.");
+        }
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 }
+    );
+  };
+
+  // Helper to convert state name to code
+  const getStateCode = (stateName: string): string => {
+    const states: Record<string, string> = {
+      'Alabama': 'AL', 'Alaska': 'AK', 'Arizona': 'AZ', 'Arkansas': 'AR', 'California': 'CA',
+      'Colorado': 'CO', 'Connecticut': 'CT', 'Delaware': 'DE', 'Florida': 'FL', 'Georgia': 'GA',
+      'Hawaii': 'HI', 'Idaho': 'ID', 'Illinois': 'IL', 'Indiana': 'IN', 'Iowa': 'IA',
+      'Kansas': 'KS', 'Kentucky': 'KY', 'Louisiana': 'LA', 'Maine': 'ME', 'Maryland': 'MD',
+      'Massachusetts': 'MA', 'Michigan': 'MI', 'Minnesota': 'MN', 'Mississippi': 'MS', 'Missouri': 'MO',
+      'Montana': 'MT', 'Nebraska': 'NE', 'Nevada': 'NV', 'New Hampshire': 'NH', 'New Jersey': 'NJ',
+      'New Mexico': 'NM', 'New York': 'NY', 'North Carolina': 'NC', 'North Dakota': 'ND', 'Ohio': 'OH',
+      'Oklahoma': 'OK', 'Oregon': 'OR', 'Pennsylvania': 'PA', 'Rhode Island': 'RI', 'South Carolina': 'SC',
+      'South Dakota': 'SD', 'Tennessee': 'TN', 'Texas': 'TX', 'Utah': 'UT', 'Vermont': 'VT',
+      'Virginia': 'VA', 'Washington': 'WA', 'West Virginia': 'WV', 'Wisconsin': 'WI', 'Wyoming': 'WY',
+      'District of Columbia': 'DC'
+    };
+    return states[stateName] || 'CA';
+  };
 
   const { data: stats } = useQuery<PlatformStats>({
     queryKey: ["/api/stats"],
@@ -196,6 +279,21 @@ export default function Landing() {
                   data-testid="input-zipcode-search"
                 />
               </div>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="lg" 
+                className="h-14 px-4"
+                onClick={handleUseMyLocation}
+                disabled={isLocating}
+                title="Use my current location"
+              >
+                {isLocating ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Locate className="h-5 w-5" />
+                )}
+              </Button>
               <Button type="submit" size="lg" className="h-14 px-6" data-testid="button-find-bills">
                 <Search className="h-5 w-5 mr-2" />
                 Find Bills
