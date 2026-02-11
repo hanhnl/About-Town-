@@ -458,6 +458,96 @@ export async function searchBills(query: string, state: string = 'MD'): Promise<
   }
 }
 
+// Get legislators for the current Maryland session
+export interface MarylandLegislator {
+  personId: number;
+  name: string;
+  firstName: string;
+  lastName: string;
+  party: string;
+  district: string;
+  chamber: string; // 'House' or 'Senate'
+  role: string;
+  email?: string;
+  phone?: string;
+  photoUrl?: string;
+  website?: string;
+  ballotpedia?: string;
+}
+
+export async function getMarylandLegislators(): Promise<MarylandLegislator[]> {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    console.error('[LegiScan] No API key for legislators');
+    return [];
+  }
+  
+  try {
+    const currentSession = await getCurrentMarylandSession();
+    if (!currentSession) {
+      console.error('[LegiScan] No current session for legislators');
+      return [];
+    }
+    
+    const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionPeople&id=${currentSession.session_id}`;
+    const response = await fetch(url);
+    const data = await response.json() as any;
+    
+    if (data.status === 'ERROR') {
+      console.error('[LegiScan] Legislators API error:', data.alert?.message);
+      return [];
+    }
+    
+    const peopleObj = data.sessionpeople?.people || {};
+    console.log('[LegiScan] Found', Object.keys(peopleObj).length, 'legislators');
+    
+    const legislators = Object.values(peopleObj)
+      .filter((p: any) => {
+        // Filter to only include actual legislators (have party and district)
+        // Committees and other entities won't have party_id or district
+        return p && p.people_id && p.party_id && p.district;
+      })
+      .map((p: any) => {
+        const district = p.district || '';
+        // Determine chamber from district prefix or role
+        // SD = Senate District, HD = House District
+        // role_id: 1 = Rep (House), 2 = Sen (Senate)
+        const isSenate = district.startsWith('SD-') || p.role_id === 2 || p.role === 'Sen';
+        const districtNumber = district.replace(/^[SH]D-0*/, '');
+        
+        // Extract contact info from bio object
+        const bio = p.bio || {};
+        const social = bio.social || {};
+        
+        return {
+          personId: p.people_id,
+          name: p.name || `${p.first_name || ''} ${p.last_name || ''}`.trim(),
+          firstName: p.first_name || '',
+          lastName: p.last_name || '',
+          party: p.party || (p.party_id === '1' ? 'D' : p.party_id === '2' ? 'R' : ''),
+          district: districtNumber,
+          chamber: isSenate ? 'Senate' : 'House',
+          role: isSenate ? 'Senator' : 'Delegate',
+          email: social.email || undefined,
+          phone: social.capitol_phone || social.district_phone || undefined,
+          photoUrl: social.image || undefined,
+          website: social.biography || undefined,
+          ballotpedia: p.ballotpedia || undefined,
+        };
+      })
+      .sort((a, b) => {
+        // Sort by chamber (Senate first), then by district
+        if (a.chamber !== b.chamber) return a.chamber === 'Senate' ? -1 : 1;
+        return a.district.localeCompare(b.district, undefined, { numeric: true });
+      });
+    
+    return legislators as MarylandLegislator[];
+  } catch (error) {
+    console.error('[LegiScan] getMarylandLegislators error:', error);
+    return [];
+  }
+}
+
 // Test the API connection
 export async function testConnection(): Promise<{ success: boolean; message: string }> {
   try {

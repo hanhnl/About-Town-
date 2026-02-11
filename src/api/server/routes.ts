@@ -4,7 +4,7 @@ import { storage } from "./storage";
 import { isDatabaseConfigured } from "./db";
 import { insertBillSchema, insertCommentSchema, insertUserVoteSchema, insertUserSchema } from "../shared/schema";
 import { fetchRealBills, dataSources } from "./external-apis";
-import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getCurrentMarylandSession } from "./legiscan-service";
+import { getMarylandBills as getLegiScanBills, getMarylandSessions, getBillDetail, searchBills, testConnection as testLegiScan, isLegiScanConfigured, getCurrentMarylandSession, getMarylandLegislators } from "./legiscan-service";
 import { getMarylandBills as getOpenStatesBills, testConnection as testOpenStates, isOpenStatesConfigured } from "./openstates-service";
 import { apiRateLimiter, authRateLimiter } from "./rate-limiter";
 import { z } from "zod";
@@ -94,6 +94,32 @@ export async function registerRoutes(
         message: error instanceof Error ? error.message : String(error),
         timestamp: new Date().toISOString()
       });
+    }
+  });
+
+  // Debug endpoint for legislators raw data
+  app.get("/api/debug/legislators", async (_req, res) => {
+    try {
+      const apiKey = process.env.LEGISCAN_API_KEY;
+      const currentSession = await getCurrentMarylandSession();
+      if (!currentSession || !apiKey) {
+        return res.json({ error: 'No session or API key' });
+      }
+      
+      const url = `https://api.legiscan.com/?key=${apiKey}&op=getSessionPeople&id=${currentSession.session_id}`;
+      const response = await fetch(url);
+      const data = await response.json() as any;
+      
+      const peopleObj = data.sessionpeople?.people || {};
+      const firstFew = Object.values(peopleObj).slice(0, 5);
+      
+      res.json({
+        sessionId: currentSession.session_id,
+        totalPeople: Object.keys(peopleObj).length,
+        samplePeople: firstFew,
+      });
+    } catch (error) {
+      res.status(500).json({ error: error instanceof Error ? error.message : String(error) });
     }
   });
 
@@ -469,15 +495,58 @@ export async function registerRoutes(
 
   app.get("/api/representatives", async (req, res) => {
     try {
-      const { district, zipcode } = req.query;
-      let members;
-      if (district) {
-        members = await storage.getCouncilMembersByDistrict(district as string);
-      } else {
-        members = await storage.getCouncilMembers();
+      const { district, chamber } = req.query;
+      
+      // Try to get real legislators from LegiScan
+      if (isLegiScanConfigured()) {
+        try {
+          let legislators = await getMarylandLegislators();
+          
+          // Filter by district if provided
+          if (district) {
+            legislators = legislators.filter(l => 
+              l.district.toLowerCase().includes((district as string).toLowerCase())
+            );
+          }
+          
+          // Filter by chamber if provided
+          if (chamber) {
+            legislators = legislators.filter(l => 
+              l.chamber.toLowerCase() === (chamber as string).toLowerCase()
+            );
+          }
+          
+          if (legislators.length > 0) {
+            // Map to the expected format for the frontend
+            const reps = legislators.map((leg, index) => ({
+              id: leg.personId || index + 1,
+              name: leg.name,
+              initials: `${leg.firstName?.[0] || ''}${leg.lastName?.[0] || ''}`.toUpperCase() || leg.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase(),
+              party: leg.party === 'D' ? 'Democrat' : leg.party === 'R' ? 'Republican' : leg.party,
+              district: `MD ${leg.chamber} District ${leg.district}`,
+              chamber: leg.chamber,
+              termEnd: '2027', // Maryland legislators serve 4-year terms
+              email: leg.email || null,
+              phone: leg.phone || null,
+              website: leg.website || null,
+              bio: `Maryland ${leg.role} representing District ${leg.district} in the ${leg.chamber === 'Senate' ? 'Maryland State Senate' : 'Maryland House of Delegates'}.`,
+              photoUrl: leg.photoUrl || null,
+              isLiveData: true,
+            }));
+            
+            console.log(`[API] Returning ${reps.length} real legislators`);
+            return res.json(reps);
+          }
+        } catch (legiScanError) {
+          console.warn('[API] LegiScan legislators failed, using sample:', legiScanError);
+        }
       }
+      
+      // Fallback to sample data
+      const members = await storage.getCouncilMembers();
       res.json(members);
     } catch (error) {
+      console.error('[API] Representatives error:', error);
       res.status(500).json({ error: "Failed to fetch representatives" });
     }
   });
